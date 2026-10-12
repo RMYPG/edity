@@ -183,13 +183,15 @@ Each milestone ends with something you can try. Development publishes only to `R
 | M6. Site pipeline | The release-on-Publish workflow lands in the template and `edity-sandbox`; `fisioindoor` is connected | 1 day |
 | M7. Device pass | Tested with Spanish accents and emoji, iOS Safari, Android Chrome, translation and grammar extensions | 1.5 to 2 days |
 
+The work is split into tickets in [`issues/`](issues/): 01 to 29 for v1, and 30 to 32 for the deferred backlog.
+
 Estimates are rough guesses for one developer, about 13 to 18 days in total. M2 is the experiment: it is where the time is best spent, and it can be shown to a Client before M4 exists.
 
 **Platform dependencies**
 
 - [RMYPG/platform#39](https://github.com/RMYPG/platform/issues/39): Flux image automation. M5's Deploying and Live stages only end once Releases deploy automatically.
 - [RMYPG/platform#41](https://github.com/RMYPG/platform/issues/41): self-hosted Pact Broker, needed for N11 in M4.
-- A third issue, still to be written with the tickets: deploying `edity-server`. It covers the gitops app, the tunnel routes per Site, the Zitadel project, roles and OIDC client, network access to `vmsingle`, and the GitHub App key as a secret. Needed for M5.
+- [RMYPG/platform#42](https://github.com/RMYPG/platform/issues/42): deploying `edity-server`. It covers the gitops app, the tunnel routes per Site, the Zitadel project, roles and OIDC client, network access to `vmsingle`, and the GitHub App key as a secret. Needed for M5.
 
 **After v1:** a migration skill, written once `fisioindoor` and `vertex-glow` have both been migrated by hand.
 
