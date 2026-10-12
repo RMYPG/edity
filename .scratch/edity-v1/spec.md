@@ -200,6 +200,7 @@ Estimates are rough guesses for one developer, about 13 to 18 days in total. M2 
 - [ADR-0003](../../docs/adr/0003-publish-cuts-a-release-deployment-is-out-of-scope.md): Publish cuts a Release, and deployment is out of scope
 - [ADR-0004](../../docs/adr/0004-clients-log-in-with-zitadel-from-v1.md): Clients log in with Zitadel from version one
 - [ADR-0005](../../docs/adr/0005-save-service-in-go-in-its-own-repository.md): the server is written in Go, in its own repository
+- [ADR-0006](../../docs/adr/0006-mpl-for-the-packages-agpl-for-the-server.md): MPL-2.0 for the packages, AGPL-3.0 for the server
 
 ## Resolved questions
 
@@ -215,6 +216,7 @@ Estimates are rough guesses for one developer, about 13 to 18 days in total. M2 
 | Will Clients edit from a phone? | Yes, occasionally |
 | Editor UI library | Preact 11 with signals, rendered into one shadow root |
 | npm scope | `@edity` if the npm org can be created, otherwise `@rmypg/edity-*` |
+| Licenses | MPL-2.0 for `edity` and its packages, AGPL-3.0 for `edity-server` |
 | GitHub Apps | One: `edity`, installed on Site repositories (contents write, issues write, actions, checks and metadata read) |
 
 ## Deferred backlog
