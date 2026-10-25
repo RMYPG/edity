@@ -151,6 +151,30 @@ button:focus-visible {
   color: var(--edity-muted);
 }
 
+/* The phone preview, at an iPhone's 390 x 844 px when the window holds it,
+   above the bar on the right. Under the bar, which stays on top. */
+.preview {
+  position: fixed;
+  z-index: 2147483646;
+  top: 12px;
+  right: 12px;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  max-height: 860px;
+  padding: 8px;
+  border-radius: 22px;
+  background: var(--edity-surface);
+  box-shadow: var(--edity-shadow);
+}
+
+.preview iframe {
+  display: block;
+  width: 390px;
+  height: 100%;
+  border: 0;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
 .back {
   position: fixed;
   z-index: 2147483647;
@@ -202,6 +226,11 @@ svg {
 
   button {
     padding: 0 10px;
+  }
+
+  /* The page is at about a phone's width already. */
+  .preview-toggle {
+    display: none;
   }
 
   .client,

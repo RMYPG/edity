@@ -1,9 +1,10 @@
-import { batch } from '@preact/signals';
+import { batch, useSignal, type Signal } from '@preact/signals';
 import { useEffect, useRef } from 'preact/hooks';
 import { Counters } from './Counters.js';
 import type { Fields } from './fields.js';
 import { ListControls } from './ListControls.js';
 import type { Lists } from './lists.js';
+import { Preview, PreviewToggle } from './Preview.js';
 import type { EditorState } from './state.js';
 import type { Limits } from './watch-limits.js';
 
@@ -26,6 +27,8 @@ export function Editor({ state, fields, lists, limits }: Props) {
     started.current = true;
   }, []);
   const focus = started.current;
+  // Kept while the visitor view hides it.
+  const preview = useSignal(false);
 
   return (
     <div class="edity" lang={state.locale}>
@@ -48,8 +51,17 @@ export function Editor({ state, fields, lists, limits }: Props) {
             lists={lists}
             limits={limits}
             focus={focus}
+            preview={preview}
           />
           <Counters limits={limits} t={state.t} />
+          {preview.value && (
+            <Preview
+              state={state}
+              fields={fields}
+              limits={limits}
+              open={preview}
+            />
+          )}
         </>
       )}
     </div>
@@ -61,7 +73,12 @@ interface ViewProps extends Props {
   readonly focus: boolean;
 }
 
-function Bar({ state, fields, lists, focus }: ViewProps) {
+interface BarProps extends ViewProps {
+  /** Whether the phone preview shows. */
+  readonly preview: Signal<boolean>;
+}
+
+function Bar({ state, fields, lists, focus, preview }: BarProps) {
   const { session, t, draft, view, publishDisabled } = state;
   const count = draft.count.value;
   const visitorView = useFocusOnMount(focus);
@@ -98,7 +115,7 @@ function Bar({ state, fields, lists, focus }: ViewProps) {
         {t.publish}
       </button>
       <span class="tools">
-        {/* Ticket 15's phone-preview toggle goes here. */}
+        <PreviewToggle open={preview} t={t} />
         <button
           ref={visitorView}
           type="button"

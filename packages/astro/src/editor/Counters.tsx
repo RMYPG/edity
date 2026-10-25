@@ -7,6 +7,11 @@ import type { Limits, LimitMark } from './watch-limits.js';
 interface Props {
   readonly limits: Limits;
   readonly t: Messages;
+  /**
+   * The document whose Fields' counters these are, which they are rendered
+   * into: the page's, or the phone preview's frame's.
+   */
+  readonly of?: Document;
 }
 
 /**
@@ -14,13 +19,13 @@ interface Props {
  * (L3, L4, L7): the focused Field's at 80% of a Limit, and every Field's that
  * breaks one.
  */
-export function Counters({ limits, t }: Props) {
+export function Counters({ limits, t, of = document }: Props) {
   const root = useRef<HTMLDivElement | null>(null);
   useSheet(root, css);
   const keyOf = useKeys();
   // Another document's Fields, such as the phone preview's, show their own.
   const marks = limits.marks.value.filter(
-    (mark) => mark.box !== undefined && mark.element.ownerDocument === document,
+    (mark) => mark.box !== undefined && mark.element.ownerDocument === of,
   );
   return (
     <div ref={root} class="counters">
@@ -37,10 +42,12 @@ function Counter({ mark, t }: { mark: LimitMark; t: Messages }) {
   useLayoutEffect(() => {
     const counter = ref.current;
     if (counter === null || box === undefined) return;
+    const { documentElement, defaultView } = counter.ownerDocument;
+    const scrollX = defaultView?.scrollX ?? 0;
     // Below the text, and inside the page's width.
-    const width = document.documentElement.clientWidth + window.scrollX;
+    const width = documentElement.clientWidth + scrollX;
     const left = Math.max(
-      window.scrollX + 4,
+      scrollX + 4,
       Math.min(box.left, width - counter.offsetWidth - 4),
     );
     counter.style.top = `${box.bottom + 6}px`;
@@ -82,8 +89,10 @@ function useKeys(): (element: Element) => number {
 function useSheet(ref: { readonly current: Element | null }, css: string) {
   useLayoutEffect(() => {
     const root = ref.current?.getRootNode();
-    if (!(root instanceof ShadowRoot)) return;
-    const sheet = new CSSStyleSheet();
+    // From the window of the document it is in, which may be a frame's.
+    const window = root?.ownerDocument?.defaultView;
+    if (!window || !(root instanceof window.ShadowRoot)) return;
+    const sheet = new window.CSSStyleSheet();
     sheet.replaceSync(css);
     root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
     return () => {
