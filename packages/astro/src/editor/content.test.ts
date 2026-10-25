@@ -13,6 +13,7 @@ import {
   fieldChange,
   isWellFormed,
   pathPattern,
+  sameValue,
   valueAt,
 } from './content.js';
 
@@ -105,6 +106,24 @@ describe('valueAt', () => {
     expect(valueAt(content, 'hero.title.length')).toBeUndefined();
     expect(valueAt(content, 'nope')).toBeUndefined();
     expect(valueAt(undefined, 'hero.title')).toBeUndefined();
+  });
+});
+
+describe('sameValue', () => {
+  test('compares content values by what they hold, Fields in any order', () => {
+    const plan = { name: 'Básico', price: 19.99, features: ['Una', 'Dos'] };
+    expect(
+      sameValue(plan, {
+        features: ['Una', 'Dos'],
+        price: 19.99,
+        name: 'Básico',
+      }),
+    ).toBe(true);
+    expect(sameValue(plan, { ...plan, features: ['Dos', 'Una'] })).toBe(false);
+    expect(sameValue(plan, { name: 'Básico', price: 19.99 })).toBe(false);
+    expect(sameValue([plan], [{ ...plan }])).toBe(true);
+    expect(sameValue('12', 12)).toBe(false);
+    expect(sameValue(['a'], { 0: 'a' })).toBe(false);
   });
 });
 

@@ -1,5 +1,5 @@
-// Reading a page's Field definitions and built content by path, and the
-// Changes a Field's value makes.
+// Reading a page's Field definitions and built content by path, comparing
+// content values, and the Changes a Field's value makes.
 import {
   violations,
   type Definition,
@@ -65,6 +65,42 @@ export function valueAt(
     value = (value as Record<string, unknown>)[key];
   }
   return value as ContentValue;
+}
+
+/**
+ * Whether two content values are the same: the same text or number, Items
+ * in the same order, and Fields with the same keys, in any order.
+ */
+export function sameValue(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (Array.isArray(a)) {
+    return (
+      Array.isArray(b) &&
+      a.length === b.length &&
+      a.every((each, index) => sameValue(each, b[index]))
+    );
+  }
+  if (
+    typeof a !== 'object' ||
+    typeof b !== 'object' ||
+    a === null ||
+    b === null ||
+    Array.isArray(b)
+  ) {
+    return false;
+  }
+  const keys = Object.keys(a);
+  return (
+    keys.length === Object.keys(b).length &&
+    keys.every(
+      (key) =>
+        Object.hasOwn(b, key) &&
+        sameValue(
+          (a as Record<string, unknown>)[key],
+          (b as Record<string, unknown>)[key],
+        ),
+    )
+  );
 }
 
 /**

@@ -1,5 +1,5 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
-import { valueAt } from './content.js';
+import { sameValue, valueAt } from './content.js';
 
 /**
  * A value in a page's content: a Field's text or number, or a List's Items.
@@ -164,7 +164,7 @@ function withValueAt(
 function sameChange(a: Change, b: Change): boolean {
   return (
     a.path === b.path &&
-    JSON.stringify(a.before) === JSON.stringify(b.before) &&
-    JSON.stringify(a.after) === JSON.stringify(b.after)
+    sameValue(a.before, b.before) &&
+    sameValue(a.after, b.after)
   );
 }

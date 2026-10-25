@@ -9,7 +9,7 @@ import type {
   TextDefinition,
 } from '@edity/core';
 import type { PageMarker } from '../editable.js';
-import { definitionAt, fieldChange, valueAt } from './content.js';
+import { definitionAt, fieldChange, sameValue, valueAt } from './content.js';
 import type { Change, ContentValue } from './draft.js';
 
 /** A List as the page shows it now. */
@@ -85,7 +85,7 @@ export function listChanges(
     list.items.every((item, index) => item.origin === index);
   if (!asBuilt) {
     const after = list.items.map((item) => item.value);
-    return equal(before, after) ? [] : [{ path, before, after }];
+    return sameValue(before, after) ? [] : [{ path, before, after }];
   }
   return list.items.flatMap((item, index) =>
     itemChanges(page, definition.item, `${path}.${index}`, item),
@@ -132,7 +132,7 @@ export function originsOf(
   const taken = new Set<number>();
   return value.map((item) => {
     const origin = built.findIndex(
-      (each, index) => !taken.has(index) && equal(each, item),
+      (each, index) => !taken.has(index) && sameValue(each, item),
     );
     if (origin === -1) return undefined;
     taken.add(origin);
@@ -162,37 +162,4 @@ export function blankValue(definition: Definition): ContentValue {
         ]),
       );
   }
-}
-
-/** Whether two content values are the same. */
-export function equal(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (Array.isArray(a)) {
-    return (
-      Array.isArray(b) &&
-      a.length === b.length &&
-      a.every((each, index) => equal(each, b[index]))
-    );
-  }
-  if (
-    typeof a !== 'object' ||
-    typeof b !== 'object' ||
-    a === null ||
-    b === null ||
-    Array.isArray(b)
-  ) {
-    return false;
-  }
-  const keys = Object.keys(a);
-  return (
-    keys.length === Object.keys(b).length &&
-    keys.every(
-      (key) =>
-        Object.hasOwn(b, key) &&
-        equal(
-          (a as Record<string, unknown>)[key],
-          (b as Record<string, unknown>)[key],
-        ),
-    )
-  );
 }

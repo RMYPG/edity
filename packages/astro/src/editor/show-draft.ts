@@ -3,8 +3,8 @@
 // document's elements, so restoring a Draft kept in the browser (P2),
 // Discard and the preview show it alike.
 import { batch } from '@preact/signals';
-import { valueAt } from './content.js';
-import type { Change, ContentValue, Draft } from './draft.js';
+import { sameValue, valueAt } from './content.js';
+import type { Change, Draft } from './draft.js';
 import type { Fields } from './fields.js';
 import type { Lists } from './lists.js';
 
@@ -98,8 +98,4 @@ export function draftDelta(
  */
 export function asBuilt(change: Change, content: unknown): Change {
   return { ...change, after: valueAt(content, change.path) ?? change.before };
-}
-
-function sameValue(a: ContentValue, b: ContentValue): boolean {
-  return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
