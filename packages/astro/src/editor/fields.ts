@@ -13,6 +13,13 @@ import { pathPattern } from '../paths.js';
 import { fieldAt, fieldChange, valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
 import css from './fields.css?inline';
+import {
+  offsetAtPoint,
+  rangeIn,
+  select,
+  selectionIn,
+  type Selected,
+} from './selection.js';
 import type { EditorState } from './state.js';
 import {
   fieldValue,
@@ -79,9 +86,6 @@ interface Typed {
   readonly text: string;
   readonly selection: Selected | undefined;
 }
-
-/** Start and end offsets of a selection in a Field's text. */
-type Selected = readonly [number, number];
 
 /** Starts editing the page's Fields, for as long as the Editor runs. */
 export function editFields(state: EditorState): Fields {
@@ -606,13 +610,6 @@ function numberFormats(page: PageMarker): (path: string) => NumberFormat {
   };
 }
 
-/** Where the selection is in `element`'s text, if it is inside it. */
-function selectionIn(element: HTMLElement): Selected | undefined {
-  const selection = element.ownerDocument.getSelection();
-  if (selection === null || selection.rangeCount === 0) return undefined;
-  return rangeIn(element, selection.getRangeAt(0));
-}
-
 /** The range an input event is about to change, or the selection. */
 function targetOf(
   element: HTMLElement,
@@ -620,69 +617,4 @@ function targetOf(
 ): Selected | undefined {
   const [range] = event.getTargetRanges();
   return (range && rangeIn(element, range)) ?? selectionIn(element);
-}
-
-function rangeIn(
-  element: HTMLElement,
-  range: AbstractRange,
-): Selected | undefined {
-  if (
-    !element.contains(range.startContainer) ||
-    !element.contains(range.endContainer)
-  ) {
-    return undefined;
-  }
-  return [
-    offsetIn(element, range.startContainer, range.startOffset),
-    offsetIn(element, range.endContainer, range.endOffset),
-  ];
-}
-
-/** The offset in `element`'s text nearest to a point in the viewport. */
-function offsetAtPoint(
-  element: HTMLElement,
-  x: number,
-  y: number,
-): number | undefined {
-  const document = element.ownerDocument;
-  // Safari has only caretRangeFromPoint.
-  const position = document.caretPositionFromPoint?.(x, y);
-  const range = position ? undefined : document.caretRangeFromPoint?.(x, y);
-  const node = position?.offsetNode ?? range?.startContainer;
-  const offset = position?.offset ?? range?.startOffset;
-  if (node === undefined || offset === undefined || !element.contains(node)) {
-    return undefined;
-  }
-  return offsetIn(element, node, offset);
-}
-
-function offsetIn(element: HTMLElement, node: Node, offset: number): number {
-  const before = element.ownerDocument.createRange();
-  before.setStart(element, 0);
-  before.setEnd(node, offset);
-  return before.toString().length;
-}
-
-/** Selects from `start` to `end` in `element`'s text. */
-function select(element: HTMLElement, [start, end]: Selected): void {
-  const range = element.ownerDocument.createRange();
-  range.setStart(...position(element, start));
-  range.setEnd(...position(element, end));
-  const selection = element.ownerDocument.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-}
-
-function position(element: HTMLElement, offset: number): [Node, number] {
-  const walker = element.ownerDocument.createTreeWalker(
-    element,
-    NodeFilter.SHOW_TEXT,
-  );
-  let rest = offset;
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const length = (node as Text).length;
-    if (rest <= length) return [node, rest];
-    rest -= length;
-  }
-  return [element, element.childNodes.length];
 }

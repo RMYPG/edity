@@ -34,6 +34,7 @@ import {
   type ListNow,
 } from './list-changes.js';
 import css from './lists-page.css?inline';
+import { caretIn, clickInto, selectionIn } from './selection.js';
 import type { EditorState } from './state.js';
 import { fieldValue } from './values.js';
 
@@ -1136,81 +1137,4 @@ function overText(element: HTMLElement, x: number, y: number): boolean {
     }
   }
   return false;
-}
-
-/**
- * What a click at `point` would have done: the caret in `element` there, on
- * the line of text nearest to it.
- */
-function clickInto(element: HTMLElement, point: Point): void {
-  element.focus();
-  const y = nearestLine(element, point.y);
-  // Safari has only caretRangeFromPoint.
-  const position = document.caretPositionFromPoint?.(point.x, y);
-  const range = position
-    ? undefined
-    : document.caretRangeFromPoint?.(point.x, y);
-  const node = position?.offsetNode ?? range?.startContainer;
-  const offset = position?.offset ?? range?.startOffset;
-  if (node === undefined || offset === undefined || !element.contains(node)) {
-    caretIn(element, 'end');
-    return;
-  }
-  const caret = document.createRange();
-  caret.setStart(node, offset);
-  getSelection()?.removeAllRanges();
-  getSelection()?.addRange(caret);
-}
-
-/** The middle of the line of `element`'s text nearest to `y`. */
-function nearestLine(element: HTMLElement, y: number): number {
-  const range = document.createRange();
-  range.selectNodeContents(element);
-  let nearest = y;
-  let distance = Infinity;
-  for (const rect of range.getClientRects()) {
-    const middle = (rect.top + rect.bottom) / 2;
-    if (Math.abs(middle - y) < distance) {
-      distance = Math.abs(middle - y);
-      nearest = middle;
-    }
-  }
-  return nearest;
-}
-
-/** Focuses `element` with the caret at its start or end. */
-function caretIn(
-  element: HTMLElement | undefined,
-  where: 'start' | 'end',
-): void {
-  if (element === undefined) return;
-  element.focus();
-  const range = document.createRange();
-  range.selectNodeContents(element);
-  range.collapse(where === 'start');
-  getSelection()?.removeAllRanges();
-  getSelection()?.addRange(range);
-}
-
-/** Where the selection starts and ends in `element`'s text, if it is in it. */
-function selectionIn(element: HTMLElement): [number, number] | undefined {
-  const selection = getSelection();
-  if (selection === null || selection.rangeCount === 0) return undefined;
-  const range = selection.getRangeAt(0);
-  if (
-    !element.contains(range.startContainer) ||
-    !element.contains(range.endContainer)
-  ) {
-    return undefined;
-  }
-  const offset = (node: Node, at: number) => {
-    const before = document.createRange();
-    before.setStart(element, 0);
-    before.setEnd(node, at);
-    return before.toString().length;
-  };
-  return [
-    offset(range.startContainer, range.startOffset),
-    offset(range.endContainer, range.endOffset),
-  ];
 }
