@@ -1,0 +1,10 @@
+{
+  // The browser tests run in Node, but the functions they pass to
+  // page.evaluate() run in the browser.
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "noEmit": true
+  },
+  "include": ["."]
+}

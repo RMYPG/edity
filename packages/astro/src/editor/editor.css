@@ -1,0 +1,216 @@
+/*
+ * The Editor's styles, adopted by its shadow root (N4). Site rules cannot
+ * select anything inside it, and these rules cannot select anything outside.
+ *
+ * Only the host can be reached by Site rules such as `*` or `:root > *`, and
+ * properties the Site sets on <html> would be inherited through it. For
+ * !important declarations the shadow tree's own rules beat the page's, so
+ * resetting every property here, with !important, wins over both.
+ *
+ * Units are px, never rem, which follows the Site's <html> font size. Colors
+ * are custom properties set below the host, where the Site cannot set them.
+ */
+:host {
+  all: initial !important;
+  display: block !important;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+.edity {
+  --edity-surface: #1d2328;
+  --edity-surface-hover: #2b343b;
+  --edity-text: #f3f5f6;
+  --edity-muted: #b3bdc4;
+  --edity-line: #3d4851;
+  --edity-accent: #3b82f6;
+  --edity-accent-hover: #2f6fdb;
+  --edity-on-accent: #ffffff;
+  --edity-focus: #93c5fd;
+  --edity-shadow:
+    0 8px 28px rgb(0 0 0 / 0.28), 0 0 0 1px rgb(255 255 255 / 0.06);
+
+  color: var(--edity-text);
+  font:
+    14px/20px system-ui,
+    -apple-system,
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* The host sits after <body>, so this adds room below the page's end. */
+.spacer {
+  height: 76px;
+}
+
+.bar {
+  position: fixed;
+  z-index: 2147483647;
+  right: 8px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  margin: 0 auto;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--edity-surface);
+  box-shadow: var(--edity-shadow);
+}
+
+.client {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 6px 0 2px;
+}
+
+.avatar {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--edity-line);
+  font-weight: 600;
+}
+
+.name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  padding: 0 6px;
+  color: var(--edity-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+button {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  margin: 0;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--edity-focus);
+  outline-offset: 2px;
+}
+
+.discard {
+  box-shadow: inset 0 0 0 1px var(--edity-line);
+}
+
+.publish {
+  background: var(--edity-accent);
+  color: var(--edity-on-accent);
+  font-weight: 600;
+}
+
+.tools {
+  display: flex;
+  gap: 2px;
+  margin-left: 2px;
+  padding-left: 6px;
+  border-left: 1px solid var(--edity-line);
+}
+
+.tool {
+  padding: 0 10px;
+  color: var(--edity-muted);
+}
+
+.back {
+  position: fixed;
+  z-index: 2147483647;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  border-radius: 999px;
+  background: var(--edity-surface);
+  box-shadow: var(--edity-shadow);
+  opacity: 0.85;
+}
+
+@media (hover: hover) {
+  .discard:not(:disabled):hover,
+  .tool:hover {
+    background: var(--edity-surface-hover);
+    color: var(--edity-text);
+  }
+
+  .publish:not(:disabled):hover {
+    background: var(--edity-accent-hover);
+  }
+
+  .back:hover {
+    opacity: 1;
+  }
+}
+
+.back:focus-visible {
+  opacity: 1;
+}
+
+svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+/* On a phone the Client's badge goes and the tools keep only their icons,
+   but screen readers still get their text. */
+@media (max-width: 560px) {
+  .bar {
+    gap: 4px;
+  }
+
+  button {
+    padding: 0 10px;
+  }
+
+  .client,
+  .tool .label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
