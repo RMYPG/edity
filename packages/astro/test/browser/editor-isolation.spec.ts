@@ -147,7 +147,9 @@ test("the Site's CSS does not reach the Editor", async ({
   // A Limit counter shows too (L3).
   await page.locator('[data-edity-field="contact.call"]').click();
   await page.keyboard.type(' ya mismo, por favor');
-  await expect(page.locator('edity-root .counter')).toHaveCount(1);
+  // Over the Limit, once the last key's check has run: before it, the
+  // counter shows the Field near it, and Publish is still enabled.
+  await expect(page.locator('edity-root .counter.over')).toHaveCount(1);
   // The same elements after, though the Site's CSS can make more counters
   // show, for Fields it gives more lines.
   const elements = await editorElements(page);
