@@ -1,0 +1,38 @@
+/*
+ * The Limit counters, in the Editor's shadow root next to editor.css, which
+ * sets the fonts and colors they use. Each sits just below its Field's text,
+ * in page coordinates, so it scrolls with the page. Clicks go through to the
+ * page below.
+ */
+.counters {
+  --edity-over: #dc2626;
+  --edity-warning: #b45309;
+}
+
+.counter {
+  position: absolute;
+  z-index: 2147483646;
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100vw - 8px);
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: var(--edity-surface);
+  box-shadow: var(--edity-shadow);
+  color: var(--edity-text);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.counter.over {
+  background: var(--edity-over);
+  color: #ffffff;
+}
+
+.counter.warning {
+  background: var(--edity-warning);
+  color: #ffffff;
+}
