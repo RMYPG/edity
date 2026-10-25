@@ -816,7 +816,6 @@ test.describe('Enter and Backspace in simple Lists (S4)', () => {
   test('Backspace in an empty Item removes it, and the caret goes to the end of the one before', async ({
     page,
     openEditor,
-    editor,
   }) => {
     await openEditor();
     await focusField(page, 'services.1');
@@ -832,10 +831,6 @@ test.describe('Enter and Backspace in simple Lists (S4)', () => {
       `${built.services[0]}!`,
       ...built.services.slice(2),
     ]);
-    // Nothing was lost, so there is nothing to undo.
-    await expect(editor.getByRole('button', { name: 'Deshacer' })).toHaveCount(
-      0,
-    );
   });
 
   test('a List inside an Item takes Enter and Backspace too', async ({
@@ -949,6 +944,39 @@ test.describe('Undo (S6)', () => {
       0,
     );
     // The List is as built again, so only the edited Field is a Change.
+    await expect(bar.getByRole('status')).toHaveText('1 cambio');
+  });
+
+  test('removing an empty Item with Backspace offers the same Undo', async ({
+    page,
+    openEditor,
+    editor,
+    bar,
+  }) => {
+    await openEditor();
+    await focusField(page, 'services.1');
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    await expect(item(page, 'services.0')).toBeFocused();
+    expect(await texts(page, 'services')).toEqual([
+      built.services[0],
+      ...built.services.slice(2),
+    ]);
+    // An empty Item is named by its position.
+    await expect(
+      editor.getByRole('status').filter({ hasText: 'quitado' }),
+    ).toHaveText('«elemento 2» quitado' + 'Deshacer');
+
+    await editor.getByRole('button', { name: 'Deshacer' }).click();
+
+    await expect
+      .poll(() => texts(page, 'services'))
+      .toEqual([built.services[0], '', ...built.services.slice(2)]);
+    await expect(editor.getByRole('button', { name: 'Deshacer' })).toHaveCount(
+      0,
+    );
+    // The List is as built again: the emptied Field is the one Change.
     await expect(bar.getByRole('status')).toHaveText('1 cambio');
   });
 

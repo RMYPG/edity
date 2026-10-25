@@ -508,7 +508,7 @@ function editPage(
     return element;
   }
 
-  function remove(element: HTMLElement, undoable: boolean): boolean {
+  function remove(element: HTMLElement): boolean {
     const list = listOf(element);
     const definition = definitionOf(list);
     const elements = itemsOf(list);
@@ -520,7 +520,7 @@ function editPage(
     element.remove();
     renumber(list);
     edited(list);
-    if (undoable) offerUndo({ element, list, index, name });
+    offerUndo({ element, list, index, name });
     return true;
   }
 
@@ -633,7 +633,10 @@ function editPage(
     return true;
   }
 
-  /** Backspace in an empty Item of a simple List removes it. */
+  /**
+   * Backspace in an empty Item of a simple List removes it, with the Undo
+   * the remove button offers (S6).
+   */
   function removeEmpty(target: EventTarget | null): boolean {
     const found = simpleItemOf(target);
     if (found === undefined || (found.field.textContent ?? '') !== '') {
@@ -643,7 +646,7 @@ function editPage(
     const index = elements.indexOf(found.item);
     const previous = elements[index - 1];
     const next = elements[index + 1];
-    if (!remove(found.item, false)) return false;
+    if (!remove(found.item)) return false;
     if (previous !== undefined) caretIn(firstField(previous), 'end');
     else if (next !== undefined) caretIn(firstField(next), 'start');
     return true;
@@ -1041,7 +1044,7 @@ function editPage(
         move(element, itemsOf(listOf(element)).indexOf(element) + step);
       },
       remove(element) {
-        remove(element, true);
+        remove(element);
       },
       undo,
       keepUndo,
