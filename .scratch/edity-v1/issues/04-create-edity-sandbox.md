@@ -1,6 +1,6 @@
 # 04. Create the edity-sandbox Site
 
-Status: ready-for-human
+Status: ready-for-agent
 Repo: RMYPG/edity-sandbox
 Milestone: M0
 
@@ -10,9 +10,14 @@ Create `RMYPG/edity-sandbox` from `static-astro-site-template`, so development c
 
 ## Acceptance criteria
 
-- [ ] The repo exists, CI builds its image to GHCR, and `release.yml` works
+- [x] The repo exists and CI builds its image to GHCR
+- [ ] `release.yml` produces a `vX.Y.Z` tag and image
 - [ ] The page covers text, numbers, a simple List and a nested List
 
 ## Notes
 
 Creating the repository is a GitHub action the Developer should confirm. Deployment with a hostname comes with the platform issue for `edity-server`.
+
+## Comments
+
+2026-10-25: The Developer created `RMYPG/edity-sandbox` from the template; CI is green and `ghcr.io/rmypg/edity-sandbox` is linked to the repo. Remaining for an agent: the page content and a first release.

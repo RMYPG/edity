@@ -1,6 +1,6 @@
 # 21. Create the edity-publisher GitHub App
 
-Status: ready-for-human
+Status: resolved
 Repo: RMYPG (GitHub org)
 Milestone: M4
 
@@ -10,6 +10,10 @@ Create the `edity-publisher` GitHub App in the `RMYPG` org with contents write, 
 
 ## Acceptance criteria
 
-- [ ] The App exists with exactly those permissions and no active webhook
-- [ ] It is installed on `edity-sandbox` and nothing else
-- [ ] The `dev` environment of the `edity` Infisical project holds the App ID and private key under `/github`
+- [x] The App exists with exactly those permissions and no active webhook
+- [x] It is installed on `edity-sandbox` and nothing else
+- [x] The `dev` environment of the `edity` Infisical project holds the App ID and private key under `/github`
+
+## Comments
+
+2026-10-25: Done by the Developer. `edity-publisher` exists with the planned permissions, no webhook events, installable only on this account, and is installed on `edity-sandbox` only. One private key and the App ID are in the `edity` Infisical project, `dev`, `/github`.
