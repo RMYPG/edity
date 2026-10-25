@@ -9,16 +9,20 @@
 // Draft gets the Changes of the outermost List it was in (see
 // list-changes.ts): one for the whole List once its structure changed, else
 // one for each Field the Client edited in it.
+//
+// Dragging is in list-drag.ts, the Undo's timing in undo-offer.ts, and what
+// the markup makes of a List's elements in list-elements.ts.
 import type { ListDefinition } from '@edity/core';
 import { batch, computed, signal, type ReadonlySignal } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
-import { markedPath, markup, pathAttributes, selector } from '../markup.js';
-import { childPath, itemPathOf, listPathOf, rebased } from '../paths.js';
+import { markedPath, markup, selector } from '../markup.js';
+import { childPath, itemPathOf, listPathOf } from '../paths.js';
 import { valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
-import { dropIndex, sameRow } from './drop.js';
+import { sameRow } from './drop.js';
 import { whileEditing, type On } from './edit-view.js';
 import type { Fields } from './fields.js';
+import { dragItems } from './list-drag.js';
 import {
   listAt,
   listChanges,
@@ -27,21 +31,23 @@ import {
   type ItemNow,
   type ListNow,
 } from './list-changes.js';
+import {
+  firstField,
+  itemsOf,
+  listOf,
+  renumber,
+  templateOf,
+} from './list-elements.js';
 import css from './lists-page.css?inline';
-import { caretIn, clickInto, selectionIn } from './selection.js';
+import { caretIn, selectionIn } from './selection.js';
 import { adoptSheet } from './sheets.js';
 import type { EditorState } from './state.js';
+import { undoOffer } from './undo-offer.js';
 import { fieldValue } from './values.js';
 
 const field = selector(markup.field);
 const itemSelector = selector(markup.item);
 const listSelector = selector(markup.list);
-
-/** How long the Undo after removing an Item stays (S6). */
-const undoFor = 6000;
-
-/** How far a mouse moves before a press on an Item drags it, in px. */
-const dragAfter = 4;
 
 /** The page's Lists, as the Editor edits them. */
 export interface Lists {
@@ -138,23 +144,6 @@ interface ListModel {
   readonly values: readonly ContentValue[];
 }
 
-interface Drag {
-  readonly element: HTMLElement;
-  readonly list: HTMLElement;
-  readonly pointerId: number;
-  readonly start: Point;
-  /** Where it was, to put it back if the drag is cancelled. */
-  readonly next: Node | null;
-  readonly index: number;
-  /**
-   * The Field pressed outside its text: if the pointer does not move, the
-   * press was a click into that Field.
-   */
-  readonly field: HTMLElement | undefined;
-  point: Point;
-  moving: boolean;
-}
-
 interface Point {
   readonly x: number;
   readonly y: number;
@@ -203,14 +192,14 @@ function editPage(
   const layout = signal(0);
   const hovered = signal<HTMLElement | undefined>(undefined);
   const touched = signal<HTMLElement | undefined>(undefined);
-  const dragged = signal<HTMLElement | undefined>(undefined);
-  const removal = signal<Removal | undefined>(undefined);
+  const drags = dragItems({ dropped: moved, relayout });
+  const undos = undoOffer<Removal>();
   const announcement = signal({ text: '', id: 0 });
   /** Which of the two changed last, and so wins. */
   const pointed = signal(false);
   const active = computed(
     () =>
-      dragged.value ??
+      drags.dragged.value ??
       (pointed.value
         ? (hovered.value ?? touched.value)
         : (touched.value ?? hovered.value)),
@@ -299,10 +288,6 @@ function editPage(
     return element !== null && items.has(element) ? element : undefined;
   }
 
-  function listOf(element: HTMLElement): HTMLElement {
-    return element.parentElement as HTMLElement;
-  }
-
   // -------------------------------------------------------------------------
   // The Draft
 
@@ -388,7 +373,7 @@ function editPage(
 
   /** After an edit to `list`'s structure: the Draft, and the controls. */
   function edited(list: HTMLElement): void {
-    dismissUndo();
+    undos.dismiss();
     sync(markedPath(list, markup.list));
     relayout();
   }
@@ -514,7 +499,7 @@ function editPage(
     element.remove();
     renumber(list);
     edited(list);
-    offerUndo({ element, list, index, name });
+    undos.offer({ element, list, index, name });
     return true;
   }
 
@@ -544,28 +529,8 @@ function editPage(
   // -------------------------------------------------------------------------
   // Undo (S6)
 
-  let undoTimer = 0;
-
-  function offerUndo(removed: Removal): void {
-    removal.value = removed;
-    keepUndo(false);
-  }
-
-  function keepUndo(keep: boolean): void {
-    clearTimeout(undoTimer);
-    if (!keep && removal.peek() !== undefined) {
-      undoTimer = window.setTimeout(dismissUndo, undoFor);
-    }
-  }
-
-  function dismissUndo(): void {
-    clearTimeout(undoTimer);
-    removal.value = undefined;
-  }
-
   function undo(): void {
-    const removed = removal.peek();
-    dismissUndo();
+    const removed = undos.take();
     if (removed === undefined) return;
     const { element, list, index } = removed;
     const definition = listDefinition(list);
@@ -647,9 +612,8 @@ function editPage(
   }
 
   function keydown(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && drag !== undefined) {
+    if (event.key === 'Escape' && drags.cancel()) {
       event.preventDefault();
-      cancel();
       return;
     }
     if (
@@ -685,169 +649,13 @@ function editPage(
   }
 
   // -------------------------------------------------------------------------
-  // Dragging (S2): a mouse anywhere in an Item outside text, or any pointer
-  // on the Item's handle. The pointer is captured by the List, which never
-  // moves: an element that moves loses its capture.
-
-  let drag: Drag | undefined;
-  /** When the last drag ended, to drop the click it ends with. */
-  let dropped = -Infinity;
+  // Dragging (S2): see list-drag.ts.
 
   function press(event: PointerEvent): void {
     if (inEditor(event)) return;
     const element = itemOf(event.target);
     touch(element);
-    if (
-      drag !== undefined ||
-      element === undefined ||
-      event.pointerType !== 'mouse' ||
-      event.button !== 0 ||
-      event.altKey ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.shiftKey
-    ) {
-      return;
-    }
-    const target = event.target as Element;
-    const pressed = target.closest<HTMLElement>(field) ?? undefined;
-    if (pressed && overText(pressed, event.clientX, event.clientY)) return;
-    // No text selection, and no native drag of a link or image.
-    event.preventDefault();
-    begin(element, event, false, pressed);
-  }
-
-  function grab(element: HTMLElement, event: PointerEvent): void {
-    if (
-      drag !== undefined ||
-      (event.pointerType === 'mouse' && event.button !== 0)
-    ) {
-      return;
-    }
-    event.preventDefault();
-    begin(element, event, true, undefined);
-  }
-
-  function begin(
-    element: HTMLElement,
-    event: PointerEvent,
-    moving: boolean,
-    pressed: HTMLElement | undefined,
-  ): void {
-    const list = listOf(element);
-    const point = { x: event.clientX, y: event.clientY };
-    drag = {
-      element,
-      list,
-      pointerId: event.pointerId,
-      start: point,
-      next: element.nextSibling,
-      index: itemsOf(list).indexOf(element),
-      field: pressed,
-      point,
-      moving,
-    };
-    if (moving) dragged.value = element;
-    try {
-      list.setPointerCapture(event.pointerId);
-    } catch {
-      // A synthetic pointer cannot be captured, but its events still
-      // reach the document.
-    }
-  }
-
-  function pointerMove(event: PointerEvent): void {
-    pointer = { x: event.clientX, y: event.clientY };
-    if (drag === undefined || event.pointerId !== drag.pointerId) return;
-    drag.point = { x: event.clientX, y: event.clientY };
-    if (!drag.moving) {
-      const { x, y } = drag.start;
-      if (Math.hypot(drag.point.x - x, drag.point.y - y) < dragAfter) return;
-      drag.moving = true;
-      dragged.value = drag.element;
-    }
-    event.preventDefault();
-    follow();
-    scrollNearEdges();
-  }
-
-  /** Moves the dragged Item to where the pointer is. */
-  function follow(): void {
-    if (drag === undefined) return;
-    const { list, element, point } = drag;
-    const elements = itemsOf(list);
-    const from = elements.indexOf(element);
-    const to = dropIndex(
-      elements.map((each) => each.getBoundingClientRect()),
-      from,
-      point,
-    );
-    if (to === from) return;
-    list.insertBefore(
-      element,
-      to > from ? elements[to]!.nextSibling : elements[to]!,
-    );
-    relayout();
-  }
-
-  function release(event: PointerEvent): void {
-    if (drag === undefined || event.pointerId !== drag.pointerId) return;
-    const { element, index, moving, field: pressed, point } = drag;
-    end();
-    if (moving) {
-      dropped = performance.now();
-      moved(element, index);
-    } else if (pressed !== undefined) {
-      clickInto(pressed, point);
-    }
-  }
-
-  function cancel(): void {
-    if (drag === undefined) return;
-    const { element, list, next, moving } = drag;
-    end();
-    if (moving) {
-      list.insertBefore(element, next);
-      relayout();
-    }
-  }
-
-  function end(): void {
-    drag = undefined;
-    dragged.value = undefined;
-    cancelAnimationFrame(scrolling);
-    scrolling = 0;
-  }
-
-  /** Drops the click that ends a drag, which could follow a link. */
-  function swallowClick(event: MouseEvent): void {
-    if (performance.now() - dropped > 300) return;
-    dropped = -Infinity;
-    event.preventDefault();
-    event.stopPropagation();
-  }
-
-  let scrolling = 0;
-  /** While a drag is near the top or bottom of the window, scrolls. */
-  function scrollNearEdges(): void {
-    if (scrolling !== 0) return;
-    const step = () => {
-      scrolling = 0;
-      if (drag === undefined) return;
-      const edge = 40;
-      const { y } = drag.point;
-      const by =
-        y < edge
-          ? (y - edge) / 2
-          : y > innerHeight - edge
-            ? (y - innerHeight + edge) / 2
-            : 0;
-      if (by === 0) return;
-      scrollBy(0, by);
-      follow();
-      scrolling = requestAnimationFrame(step);
-    };
-    scrolling = requestAnimationFrame(step);
+    if (element !== undefined) drags.press(element, event);
   }
 
   // -------------------------------------------------------------------------
@@ -856,12 +664,16 @@ function editPage(
   /** Where the pointer last was, to tell its moves from the page's. */
   let pointer: Point = { x: Number.NaN, y: Number.NaN };
 
+  function track(event: PointerEvent): void {
+    pointer = { x: event.clientX, y: event.clientY };
+  }
+
   function hover(event: PointerEvent): void {
     const still = event.clientX === pointer.x && event.clientY === pointer.y;
     pointer = { x: event.clientX, y: event.clientY };
     // An Item that moves from under a pointer that stays, such as after a
     // click on its own move button, keeps its controls.
-    if (drag !== undefined || still || inEditor(event)) return;
+    if (drags.pressed || still || inEditor(event)) return;
     batch(() => {
       hovered.value =
         event.pointerType === 'mouse' ? itemOf(event.target) : undefined;
@@ -967,20 +779,18 @@ function editPage(
   function start(on: On, signal: AbortSignal): () => void {
     on('pointerover', hover);
     on('pointerdown', press, true);
-    on('pointermove', pointerMove, true);
-    on('pointerup', release, true);
-    on('pointercancel', cancel, true);
+    on('pointermove', track, true);
+    drags.listen(on);
     on('focusin', focusIn);
     // Before fields.ts's listeners, which leave the Field on Enter.
     on('keydown', keydown, true);
     on('beforeinput', beforeInput, true);
-    on('click', swallowClick, true);
     window.addEventListener('resize', relayout, { signal });
     document.fonts.addEventListener('loadingdone', relayout, { signal });
     const removeSheet = adoptSheet(document, css);
 
     return () => {
-      cancel();
+      drags.cancel();
       removeSheet();
       hovered.value = undefined;
       touch(undefined);
@@ -1000,14 +810,14 @@ function editPage(
         batch(() => showList(list, value));
         return;
       }
-      dismissUndo();
+      undos.dismiss();
       quietly(() => showList(list, value));
       relayout();
     },
     controls: {
       layout,
-      dragged,
-      removed: removal,
+      dragged: drags.dragged,
+      removed: undos.offered,
       announcement,
       shown,
       add(list) {
@@ -1023,8 +833,8 @@ function editPage(
         remove(element);
       },
       undo,
-      keepUndo,
-      grab,
+      keepUndo: undos.keep,
+      grab: drags.grab,
     },
   };
 }
@@ -1034,82 +844,4 @@ function inEditor(event: Event): boolean {
   return (
     event.target instanceof Element && event.target.localName === 'edity-root'
   );
-}
-
-// The page's elements and the phone preview's come from two windows, each
-// with its own HTMLElement, so nothing below tells elements apart with
-// `instanceof`.
-
-/** A List element's Items, in order. */
-function itemsOf(list: HTMLElement): HTMLElement[] {
-  return [...list.children].filter((child) =>
-    child.hasAttribute(markup.item),
-  ) as HTMLElement[];
-}
-
-/** The <template> a List's new Items come from (S3). */
-function templateOf(list: HTMLElement): HTMLTemplateElement | undefined {
-  return (
-    list.querySelector<HTMLTemplateElement>(
-      `:scope > template${selector(markup.template)}`,
-    ) ?? undefined
-  );
-}
-
-/** Gives every Item of `list` the path of its place. */
-function renumber(list: HTMLElement): void {
-  const path = markedPath(list, markup.list);
-  itemsOf(list).forEach((element, index) => {
-    const from = markedPath(element, markup.item);
-    const to = childPath(path, index);
-    if (from !== to) rewrite(element, from, to);
-  });
-}
-
-/**
- * Rewrites every path in `root` that is `from` or starts with it, templates
- * included, to start with `to` instead.
- */
-function rewrite(root: Element | DocumentFragment, from: string, to: string) {
-  const elements =
-    root.nodeType === Node.ELEMENT_NODE
-      ? [root as Element, ...root.querySelectorAll('*')]
-      : [...root.querySelectorAll('*')];
-  for (const element of elements) {
-    for (const name of pathAttributes) {
-      const value = element.getAttribute(name);
-      const moved = value === null ? undefined : rebased(value, from, to);
-      if (moved !== undefined) element.setAttribute(name, moved);
-    }
-    if (element.localName === 'template') {
-      rewrite((element as HTMLTemplateElement).content, from, to);
-    }
-  }
-}
-
-/** The first Field an Item shows, which may be the Item itself. */
-function firstField(element: HTMLElement): HTMLElement | undefined {
-  return element.matches(field)
-    ? element
-    : (element.querySelector<HTMLElement>(field) ?? undefined);
-}
-
-/** Whether a point is over the text of `element`, not beside it. */
-function overText(element: HTMLElement, x: number, y: number): boolean {
-  const range = document.createRange();
-  const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT);
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    range.selectNodeContents(node);
-    for (const rect of range.getClientRects()) {
-      if (
-        x >= rect.left &&
-        x <= rect.right &&
-        y >= rect.top &&
-        y <= rect.bottom
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
