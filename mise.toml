@@ -72,7 +72,10 @@ trap 'rm -rf "$out"' EXIT
 pnpm -r pack --pack-destination "$out" > /dev/null
 for tarball in "$out"/*.tgz; do
   pnpm exec publint run "$tarball" --strict
-  pnpm exec attw "$tarball" --profile esm-only --format table-flipped
+  # .astro components ship as source with no type declarations: Vite compiles
+  # them in the Site, and Astro's tooling reads their Props.
+  pnpm exec attw "$tarball" --profile esm-only --format table-flipped \
+    --exclude-entrypoints ./Items.astro
 done
 '''
 

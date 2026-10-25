@@ -1,7 +1,13 @@
 packages:
   - packages/*
+  # The fixture Site the integration and the Editor are tested against.
+  - packages/astro/test/fixture
 
 strictDepBuilds: true
+
+allowBuilds:
+  esbuild: true
+  sharp: true
 
 minimumReleaseAge: 4320 # 3 days
 # minimumReleaseAgeExclude:

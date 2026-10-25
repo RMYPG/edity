@@ -4,8 +4,15 @@ import shared from '../../vitest.shared.js';
 export default mergeConfig(
   shared,
   defineProject({
+    // What the integration defines for the template helpers in a Site build.
+    define: {
+      __EDITY_OPTIONS__: JSON.stringify({ enabled: true }),
+    },
     test: {
       name: '@edity/astro',
+      // Tests in test/ build the fixture Site, which takes a few seconds.
+      testTimeout: 60_000,
+      hookTimeout: 120_000,
     },
   }),
 );
