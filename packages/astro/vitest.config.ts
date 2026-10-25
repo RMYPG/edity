@@ -6,7 +6,10 @@ export default mergeConfig(
   defineProject({
     // What the integration defines for the template helpers in a Site build.
     define: {
-      __EDITY_OPTIONS__: JSON.stringify({ enabled: true }),
+      __EDITY_OPTIONS__: JSON.stringify({
+        enabled: true,
+        narrowScreens: '(width < 600px)',
+      }),
     },
     test: {
       name: '@edity/astro',

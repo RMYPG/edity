@@ -48,7 +48,7 @@ const content = {
 const home = editable(fields, { collection: 'home', data: content });
 
 describe('the page marker', () => {
-  test("holds the page's name, Field definitions and content as JSON", () => {
+  test("holds the page's name, Field definitions, content and narrow screens as JSON", () => {
     expect(JSON.parse(home.page!)).toEqual({
       page: 'home',
       fields: {
@@ -99,6 +99,7 @@ describe('the page marker', () => {
         },
       },
       content,
+      narrowScreens: '(width < 600px)',
     });
   });
 });

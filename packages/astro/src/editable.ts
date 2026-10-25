@@ -131,6 +131,11 @@ export interface PageMarker {
   readonly fields: ObjectDefinition;
   /** The page's content, as built. */
   readonly content: unknown;
+  /**
+   * The media query of the screens where text Fields' `maxLinesNarrow`
+   * applies instead of `maxLines`: the integration's `narrowScreens`.
+   */
+  readonly narrowScreens: string;
 }
 
 /**
@@ -140,6 +145,8 @@ export interface PageMarker {
 export interface HelperOptions {
   /** `false` when the integration is disabled: the helpers mark nothing. */
   readonly enabled: boolean;
+  /** The integration's `narrowScreens`, for the page marker. */
+  readonly narrowScreens: string;
 }
 
 // Replaced with the integration's options by Vite, through `define`.
@@ -171,6 +178,7 @@ export function editable<D extends FieldDefinitions<any>>(
     page: page.name,
     fields: root,
     content: entry.data,
+    narrowScreens: page.narrowScreens,
   };
   const scope: PageScope = {
     page: page.enabled ? JSON.stringify(marker) : undefined,

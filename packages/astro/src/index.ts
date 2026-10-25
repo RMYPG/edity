@@ -24,7 +24,17 @@ export interface EdityOptions {
    * `true`.
    */
   readonly enabled?: boolean;
+  /**
+   * The media query of narrow screens, where a text Field's `maxLinesNarrow`
+   * applies instead of its `maxLines` (L2). Use the one the Site's CSS
+   * switches to its phone layout at, such as `'(max-width: 480px)'`.
+   * Defaults to `'(width < 600px)'`, which takes in phones held upright.
+   */
+  readonly narrowScreens?: string;
 }
+
+/** Screens narrower than most tablets: phones held upright. */
+const narrowScreens = '(width < 600px)';
 
 /**
  * The Edity integration: add it to `integrations` in `astro.config.mjs`, then
@@ -32,7 +42,10 @@ export interface EdityOptions {
  * and `<Items>` from `@edity/astro/Items.astro`.
  */
 export default function edity(options: EdityOptions = {}): AstroIntegration {
-  const helpers: HelperOptions = { enabled: options.enabled ?? true };
+  const helpers: HelperOptions = {
+    enabled: options.enabled ?? true,
+    narrowScreens: mediaQuery(options.narrowScreens ?? narrowScreens),
+  };
   return {
     name: '@edity/astro',
     hooks: {
@@ -46,4 +59,13 @@ export default function edity(options: EdityOptions = {}): AstroIntegration {
       },
     },
   };
+}
+
+function mediaQuery(query: unknown): string {
+  if (typeof query !== 'string' || query.trim() === '') {
+    throw new TypeError(
+      `[edity] narrowScreens must be a media query, such as '(max-width: 480px)', not ${JSON.stringify(query)}`,
+    );
+  }
+  return query.trim();
 }
