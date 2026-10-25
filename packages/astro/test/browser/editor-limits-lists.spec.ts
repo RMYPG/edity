@@ -1,33 +1,7 @@
 // Limits (L1 to L7) on the Fields of Items the Client adds, moves and
 // removes (S1 to S6): ticket 12's checks follow ticket 13's Items.
-import type { Locator, Page } from '@playwright/test';
-import { expect, test } from './editor.js';
-
-/** The outline of a Field the Draft changed over a Limit (L3). */
-const red = 'rgb(220, 38, 38)';
-
-function field(page: Page, path: string): Locator {
-  return page.locator(`[data-edity-field="${path}"]`);
-}
-
-/** Clicks near the start of the Field at `path`, so its Item's controls show. */
-async function focusField(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  const box = (await locator.boundingBox())!;
-  await locator.click({ position: { x: 4, y: box.height / 2 } });
-  await expect(locator).toBeFocused();
-  return locator;
-}
-
-async function caretAtEnd(locator: Locator): Promise<void> {
-  await locator.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    range.collapse(false);
-    getSelection()!.removeAllRanges();
-    getSelection()!.addRange(range);
-  });
-}
+import type { Locator } from '@playwright/test';
+import { caretAtEnd, expect, field, focusField, red, test } from './editor.js';
 
 /** Whether the counter `counter` sits just below `element`. */
 async function below(counter: Locator, element: Locator): Promise<boolean> {

@@ -1,7 +1,14 @@
 // E1 to E8: the Client edits the page's text and number Fields in place,
 // and every edit is a Change in the Draft.
-import type { Locator, Page } from '@playwright/test';
-import { expect, test } from './editor.js';
+import type { Page } from '@playwright/test';
+import {
+  caretAtEnd,
+  editAll,
+  editAtEnd,
+  expect,
+  field,
+  test,
+} from './editor.js';
 
 /** The fixture page's built content, as `src/content/home.json` holds it. */
 const built = {
@@ -11,40 +18,6 @@ const built = {
   cta: 'Reserva tu cita',
   call: 'Llámanos',
 };
-
-/** The Site's elements that show the Field at `path`. */
-function field(page: Page, path: string): Locator {
-  return page.locator(`[data-edity-field="${path}"]`);
-}
-
-/** Puts the caret at the end of a Field's text. */
-async function caretAtEnd(locator: Locator): Promise<void> {
-  await locator.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    range.collapse(false);
-    getSelection()!.removeAllRanges();
-    getSelection()!.addRange(range);
-  });
-}
-
-/** Clicks into the Field at `path` and puts the caret at its end. */
-async function editAtEnd(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  await locator.click();
-  await expect(locator).toBeFocused();
-  await caretAtEnd(locator);
-  return locator;
-}
-
-/** Clicks into the Field at `path` and selects its text. */
-async function editAll(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  await locator.click();
-  await expect(locator).toBeFocused();
-  await page.keyboard.press('ControlOrMeta+A');
-  return locator;
-}
 
 /** The path of the focused Field, if a Field is focused. */
 function focusedPath(page: Page): Promise<string | undefined> {

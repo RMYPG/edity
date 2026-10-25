@@ -2,56 +2,18 @@
 // the page as it renders, and only Fields changed in the Draft can block
 // Publish.
 import type { Locator, Page } from '@playwright/test';
-import { ana, expect, test } from './editor.js';
+import {
+  amber,
+  ana,
+  editAll,
+  editAtEnd,
+  expect,
+  field,
+  lines,
+  red,
+  test,
+} from './editor.js';
 import { wideFont } from './wide-font.js';
-
-/** The outline of a Field the Draft changed over a Limit (L3). */
-const red = 'rgb(220, 38, 38)';
-/** The outline of a Field over a Limit as published (L7). */
-const amber = 'rgb(217, 119, 6)';
-
-/** The Site's elements that show the Field at `path`. */
-function field(page: Page, path: string): Locator {
-  return page.locator(`[data-edity-field="${path}"]`);
-}
-
-/** Clicks into the Field at `path` and selects its text. */
-async function editAll(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  await locator.click();
-  await expect(locator).toBeFocused();
-  await page.keyboard.press('ControlOrMeta+A');
-  return locator;
-}
-
-/** Clicks into the Field at `path` and puts the caret at its end. */
-async function editAtEnd(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  await locator.click();
-  await expect(locator).toBeFocused();
-  await locator.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    range.collapse(false);
-    getSelection()!.removeAllRanges();
-    getSelection()!.addRange(range);
-  });
-  return locator;
-}
-
-/**
- * The lines a block element takes on the page, from its height and line
- * height: a measure apart from the Editor's, right for plain text in one
- * font.
- */
-function lines(block: Locator): Promise<number> {
-  return block.evaluate((element) =>
-    Math.round(
-      (element as HTMLElement).offsetHeight /
-        parseFloat(getComputedStyle(element).lineHeight),
-    ),
-  );
-}
 
 const word = ' WWWWW';
 
