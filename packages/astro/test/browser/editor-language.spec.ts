@@ -39,8 +39,10 @@ const languages = [
       'Sin cambios',
       'Descartar',
       'Publicar',
+      'Vista de móvil',
       'Vista de visitante',
     ],
+    preview: 'Vista de móvil',
     visitorView: ['Volver a editar'],
   },
   {
@@ -53,22 +55,34 @@ const languages = [
       'No changes',
       'Discard',
       'Publish',
+      'Phone preview',
       'Visitor view',
     ],
+    preview: 'Phone preview',
     visitorView: ['Back to editing'],
   },
 ];
 
-for (const { locale, bar: barText, visitorView } of languages) {
+for (const { locale, bar: barText, preview, visitorView } of languages) {
   test(`with the session locale "${locale}", all the Editor's text is in that language`, async ({
     openEditor,
     editor,
     bar,
+    isMobile,
   }) => {
     await openEditor({ session: { ...ana, locale } });
 
     await expect(editor.locator('[lang]')).toHaveAttribute('lang', locale);
     expect(await editorText(editor)).toEqual(barText);
+
+    // A phone has no phone preview.
+    if (!isMobile) {
+      await bar.getByRole('button', { name: preview }).click();
+      await expect(editor.locator('iframe')).toBeVisible();
+      // The frame's title names it.
+      expect(await editorText(editor)).toEqual([...barText, preview]);
+      await bar.getByRole('button', { name: preview }).click();
+    }
 
     await bar.getByRole('button', { name: barText.at(-1) }).click();
     await expect(bar).toHaveCount(0);
