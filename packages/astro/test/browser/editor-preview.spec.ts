@@ -212,6 +212,54 @@ test.describe('on a wide screen', () => {
     await expect(field(phone, 'hero.cta')).toHaveText('Pide cita');
   });
 
+  test('List Changes in the Draft leave the preview, the page and the Editor working', async ({
+    page,
+    openEditor,
+    editor,
+    bar,
+  }) => {
+    const errors: string[] = [];
+    page.on('pageerror', (error) => errors.push(error.message));
+    await openEditor();
+    // A List Change, and a Field Change after it in the Draft.
+    await editAtEnd(page, 'services.0');
+    await editor
+      .getByRole('button', { name: 'Añadir elemento', exact: true })
+      .click();
+    await expect(field(page, 'services.4')).toBeFocused();
+    await page.keyboard.type('Masaje');
+    await editAll(page, 'hero.cta');
+    await page.keyboard.type('Pide cita');
+    await page.keyboard.press('Enter');
+    const count = bar.getByRole('status');
+    await expect(count).toHaveText('2 cambios');
+
+    await bar.getByRole('button', { name: 'Vista de móvil' }).click();
+
+    const phone = editor.locator('iframe[data-edity-preview]').contentFrame();
+    // The Field Change shows, past the List Change.
+    await expect(field(phone, 'hero.cta')).toHaveText('Pide cita');
+    // The page keeps its new Item, and the Draft both Changes.
+    await expect(field(page, 'services.4')).toHaveText('Masaje');
+    await expect(count).toHaveText('2 cambios');
+
+    // The Lists are still edited as before, with the preview open.
+    await editAtEnd(page, 'services.4');
+    await page.keyboard.type(' deportivo');
+    await expect(field(page, 'services.4')).toHaveText('Masaje deportivo');
+    await editAll(page, 'hero.cta');
+    await page.keyboard.type('Reserva ya');
+    await expect(field(phone, 'hero.cta')).toHaveText('Reserva ya');
+    await expect(count).toHaveText('2 cambios');
+
+    await bar.getByRole('button', { name: 'Descartar' }).click();
+
+    await expect(field(page, 'services.4')).toHaveCount(0);
+    await expect(field(phone, 'hero.cta')).toHaveText(built.cta);
+    await expect(count).toHaveText('Sin cambios');
+    expect(errors).toEqual([]);
+  });
+
   test('the visitor view hides the preview, and editing brings it back (P7)', async ({
     openEditor,
     editor,

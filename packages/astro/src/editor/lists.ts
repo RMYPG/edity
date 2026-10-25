@@ -355,6 +355,9 @@ function editPage(
   }
 
   fields.onInput(({ path, value, elements }) => {
+    // The phone preview's frame shows the Draft too (ticket 15): only the
+    // page's Items are edited.
+    if (elements[0]?.ownerDocument !== document) return;
     const at = itemPathOf(path);
     const element =
       at &&
