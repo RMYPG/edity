@@ -5,3 +5,5 @@ node_modules/
 pnpm-lock.yaml
 # The local issue tracker keeps its hand-written compact tables.
 .scratch/
+# Vendored as is from the JSON Schema Test Suite.
+contracts/testdata/
