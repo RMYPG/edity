@@ -7,6 +7,7 @@
 import { effect, untracked, type Signal } from '@preact/signals';
 import { render } from 'preact';
 import { useLayoutEffect, useRef } from 'preact/hooks';
+import { markup } from '../markup.js';
 import { Counters } from './Counters.js';
 import { editorRoot, readPage } from './documents.js';
 import type { Change } from './draft.js';
@@ -77,7 +78,7 @@ export function Preview({ state, fields, lists, limits, open }: Props) {
     <div class="preview">
       <iframe
         ref={frame}
-        data-edity-preview=""
+        {...{ [markup.preview]: '' }}
         src={location.pathname + location.search}
         title={state.t.phonePreview}
       />

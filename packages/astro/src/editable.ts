@@ -6,6 +6,7 @@ import {
   type ObjectDefinition,
 } from '@edity/core';
 import type * as z from 'zod/v4';
+import { markup } from './markup.js';
 
 /**
  * The value of a `data-edity-*` attribute: `<h1
@@ -293,7 +294,7 @@ function list(
         values.length,
       );
       const blankHtml = rooted(page, await renderItem(blank), blank);
-      return `${html}<template data-edity-template="${escape(path)}">${blankHtml}</template>`;
+      return `${html}<template ${markup.template}="${escape(path)}">${blankHtml}</template>`;
     },
   };
 }
@@ -347,7 +348,7 @@ const startTag =
 function rooted(page: Page, html: string, item: AnyItem): string {
   if (item.path === undefined) return html;
   const start = startTag.exec(html)?.[0] ?? '';
-  if (!start.includes(` data-edity-item="${escape(item.path)}"`)) {
+  if (!start.includes(` ${markup.item}="${escape(item.path)}"`)) {
     throw new Error(
       `[edity] The Item "${item.path}" in page "${page.name}" must start with its root element, marked with data-edity-item={item.path}`,
     );

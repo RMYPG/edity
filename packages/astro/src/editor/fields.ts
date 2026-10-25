@@ -8,6 +8,7 @@
 // lists.ts adds, moves or renumbers need nothing but `connect()`.
 import { effect, untracked } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
+import { markedPath, markup, selector } from '../markup.js';
 import { fieldAt, fieldChange, pathPattern, valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
 import css from './fields.css?inline';
@@ -23,7 +24,7 @@ import {
   type NumberFormat,
 } from './values.js';
 
-const field = '[data-edity-field]';
+const field = selector(markup.field);
 
 /** A Field whose value on the page has just changed. */
 export interface FieldInput {
@@ -102,7 +103,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   const lastNumber = new WeakMap<HTMLElement, Typed>();
 
   const definitionOf = (element: HTMLElement) =>
-    fieldAt(page.fields, element.dataset.edityField ?? '');
+    fieldAt(page.fields, markedPath(element, markup.field));
 
   /** The editable Field an event happened in. */
   function fieldOf(target: EventTarget | null): HTMLElement | undefined {
@@ -164,7 +165,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
 
   /** Records what the Client did to `element`'s Field, after any input. */
   function changed(element: HTMLElement): void {
-    const path = element.dataset.edityField ?? '';
+    const path = markedPath(element, markup.field);
     const definition = definitionOf(element);
     if (definition === undefined) return;
     const text = element.textContent ?? '';
@@ -192,7 +193,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
 
   /** Where in its text the editable form of a number Field puts `at`. */
   function editableAt(element: HTMLElement, at: number): number {
-    const format = formatOf(element.dataset.edityField ?? '');
+    const format = formatOf(markedPath(element, markup.field));
     return format.editable((element.textContent ?? '').slice(0, at)).length;
   }
 
@@ -202,7 +203,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
       // Thousands separators would read as decimal separators, so the
       // Client edits `12.000` as `12000` (E5).
       const shown = element.textContent ?? '';
-      const text = formatOf(element.dataset.edityField ?? '').editable(shown);
+      const text = formatOf(markedPath(element, markup.field)).editable(shown);
       if (text !== shown) {
         const selection = selectionIn(element);
         const [start, end] =
@@ -259,7 +260,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     if (element === document.activeElement) return;
     atFocus.delete(element);
     lastNumber.delete(element);
-    const path = element.dataset.edityField ?? '';
+    const path = markedPath(element, markup.field);
     const definition = definitionOf(element);
     if (definition === undefined) return;
     const text = element.textContent ?? '';
@@ -563,11 +564,7 @@ function fieldsIn(root: ParentNode): HTMLElement[] {
 
 /** Every element of `root` that shows the Field at `path`. */
 function elementsOf(root: ParentNode, path: string): HTMLElement[] {
-  return [
-    ...root.querySelectorAll<HTMLElement>(
-      `[data-edity-field="${CSS.escape(path)}"]`,
-    ),
-  ];
+  return [...root.querySelectorAll<HTMLElement>(selector(markup.field, path))];
 }
 
 /**
@@ -578,7 +575,7 @@ function elementsOf(root: ParentNode, path: string): HTMLElement[] {
 function numberFormats(page: PageMarker): (path: string) => NumberFormat {
   const found = new Map<string, NumberFormat>();
   for (const element of document.querySelectorAll<HTMLElement>(field)) {
-    const path = element.dataset.edityField ?? '';
+    const path = markedPath(element, markup.field);
     const pattern = pathPattern(path);
     const value = valueAt(page.content, path);
     if (

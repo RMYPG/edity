@@ -1,13 +1,17 @@
 // What the Editor reads from a document, and adds to it: the page itself,
 // or the phone preview's frame (ticket 15).
 import type { PageMarker } from '../editable.js';
+import { markup, selector } from '../markup.js';
 import css from './editor.css?inline';
 
 /** What `document`'s `data-edity-page` marker holds, if it has one. */
 export function readPage(document: Document): PageMarker | undefined {
-  const json =
-    document.querySelector<HTMLElement>('[data-edity-page]')?.dataset.edityPage;
-  return json === undefined ? undefined : (JSON.parse(json) as PageMarker);
+  const json = document
+    .querySelector(selector(markup.page))
+    ?.getAttribute(markup.page);
+  return json === undefined || json === null
+    ? undefined
+    : (JSON.parse(json) as PageMarker);
 }
 
 /**

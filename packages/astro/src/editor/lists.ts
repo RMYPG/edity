@@ -19,6 +19,7 @@ import {
   type ReadonlySignal,
 } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
+import { markedPath, markup, pathAttributes, selector } from '../markup.js';
 import { valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
 import { dropIndex, sameRow } from './drop.js';
@@ -37,17 +38,9 @@ import css from './lists-page.css?inline';
 import type { EditorState } from './state.js';
 import { fieldValue } from './values.js';
 
-const field = '[data-edity-field]';
-const itemSelector = '[data-edity-item]';
-const listSelector = '[data-edity-list]';
-
-/** The attributes that hold paths, which move with their Item. */
-const markers = [
-  'data-edity-item',
-  'data-edity-field',
-  'data-edity-list',
-  'data-edity-template',
-] as const;
+const field = selector(markup.field);
+const itemSelector = selector(markup.item);
+const listSelector = selector(markup.list);
 
 /** How long the Undo after removing an Item stays (S6). */
 const undoFor = 6000;
@@ -249,7 +242,7 @@ function editPage(
   const resized = new ResizeObserver(relayout);
 
   const definitionOf = (list: HTMLElement): ListDefinition | undefined =>
-    listAt(page.fields, list.dataset.edityList ?? '');
+    listAt(page.fields, markedPath(list, markup.list));
 
   /**
    * Whether `element` is the page's, rather than in a document the Editor
@@ -271,7 +264,7 @@ function editPage(
   function register(list: HTMLElement, built: boolean): void {
     const definition = definitionOf(list);
     if (definition === undefined) return;
-    const path = list.dataset.edityList ?? '';
+    const path = markedPath(list, markup.list);
     const content = valueAt(page.content, path);
     const values = built && Array.isArray(content) ? content : [];
     const elements = itemsOf(list);
@@ -299,9 +292,7 @@ function editPage(
     path: string,
     root: ParentNode = document,
   ): HTMLElement | undefined {
-    const list = root.querySelector<HTMLElement>(
-      `[data-edity-list="${CSS.escape(path)}"]`,
-    );
+    const list = root.querySelector<HTMLElement>(selector(markup.list, path));
     if (list === null) return undefined;
     // The phone preview's document is as built until the Draft shows there.
     registerAll(list.ownerDocument);
@@ -354,7 +345,7 @@ function editPage(
     key: string,
   ): HTMLElement | undefined {
     const list = element.querySelector<HTMLElement>(
-      `[data-edity-list="${CSS.escape(`${element.dataset.edityItem}.${key}`)}"]`,
+      selector(markup.list, `${markedPath(element, markup.item)}.${key}`),
     );
     return list !== null && lists.has(list) ? list : undefined;
   }
@@ -385,10 +376,7 @@ function editPage(
     if (elements[0] === undefined || !onPage(elements[0])) return;
     const at = itemPathOf(path);
     const element =
-      at &&
-      elements[0]?.closest<HTMLElement>(
-        `[data-edity-item="${CSS.escape(at.item)}"]`,
-      );
+      at && elements[0]?.closest<HTMLElement>(selector(markup.item, at.item));
     const model = element && items.get(element);
     if (at === undefined || !model) return;
     model.value =
@@ -408,7 +396,7 @@ function editPage(
   /** After an edit to `list`'s structure: the Draft, and the controls. */
   function edited(list: HTMLElement): void {
     dismissUndo();
-    sync(list.dataset.edityList ?? '');
+    sync(markedPath(list, markup.list));
     relayout();
   }
 
@@ -447,7 +435,7 @@ function editPage(
     const definition = definitionOf(listOf(element));
     if (model === undefined || definition === undefined) return;
     model.value = structuredClone(value);
-    const path = element.dataset.edityItem ?? '';
+    const path = markedPath(element, markup.item);
     const root = element.ownerDocument;
     if (definition.item.kind === 'text') {
       fields.show(path, value, root);
@@ -611,7 +599,7 @@ function editPage(
     if (
       !element ||
       !item ||
-      item.dataset.edityItem !== element.dataset.edityField
+      markedPath(item, markup.item) !== markedPath(element, markup.field)
     ) {
       return undefined;
     }
@@ -636,7 +624,7 @@ function editPage(
     const index = itemsOf(list).indexOf(item);
     let added: HTMLElement | undefined;
     batch(() => {
-      const path = element.dataset.edityField ?? '';
+      const path = markedPath(element, markup.field);
       fields.show(path, fieldValue(kind, text.slice(0, start)));
       added = add(list, index + 1, fieldValue(kind, text.slice(end)));
       // Adding records the List's Changes, the shorter Item's included.
@@ -1077,7 +1065,7 @@ function inEditor(event: Event): boolean {
 /** A List element's Items, in order. */
 function itemsOf(list: HTMLElement): HTMLElement[] {
   return [...list.children].filter((child) =>
-    child.hasAttribute('data-edity-item'),
+    child.hasAttribute(markup.item),
   ) as HTMLElement[];
 }
 
@@ -1085,16 +1073,16 @@ function itemsOf(list: HTMLElement): HTMLElement[] {
 function templateOf(list: HTMLElement): HTMLTemplateElement | undefined {
   return (
     list.querySelector<HTMLTemplateElement>(
-      ':scope > template[data-edity-template]',
+      `:scope > template${selector(markup.template)}`,
     ) ?? undefined
   );
 }
 
 /** Gives every Item of `list` the path of its place. */
 function renumber(list: HTMLElement): void {
-  const path = list.dataset.edityList ?? '';
+  const path = markedPath(list, markup.list);
   itemsOf(list).forEach((element, index) => {
-    const from = element.dataset.edityItem ?? '';
+    const from = markedPath(element, markup.item);
     const to = `${path}.${index}`;
     if (from !== to) rewrite(element, from, to);
   });
@@ -1110,7 +1098,7 @@ function rewrite(root: Element | DocumentFragment, from: string, to: string) {
       ? [root as Element, ...root.querySelectorAll('*')]
       : [...root.querySelectorAll('*')];
   for (const element of elements) {
-    for (const name of markers) {
+    for (const name of pathAttributes) {
       const value = element.getAttribute(name);
       if (value !== null && (value === from || value.startsWith(`${from}.`))) {
         element.setAttribute(name, to + value.slice(from.length));

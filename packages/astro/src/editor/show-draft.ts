@@ -3,6 +3,7 @@
 // document's elements, so restoring a Draft kept in the browser (P2),
 // Discard and the preview show it alike.
 import { batch } from '@preact/signals';
+import { markup, selector } from '../markup.js';
 import { sameValue, valueAt } from './content.js';
 import type { Change, Draft } from './draft.js';
 import type { Fields } from './fields.js';
@@ -41,14 +42,14 @@ export function showDraft(
 
 /** Whether `root` shows the List or the Field a Change is to. */
 function shows(root: ParentNode, { path, after }: Change): boolean {
-  const kind = Array.isArray(after)
-    ? 'list'
+  const attribute = Array.isArray(after)
+    ? markup.list
     : typeof after === 'object'
       ? undefined
-      : 'field';
+      : markup.field;
   return (
-    kind !== undefined &&
-    root.querySelector(`[data-edity-${kind}="${CSS.escape(path)}"]`) !== null
+    attribute !== undefined &&
+    root.querySelector(selector(attribute, path)) !== null
   );
 }
 

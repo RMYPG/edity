@@ -2,6 +2,7 @@
 // /_edity/editor.<hash>.js, when the browser carries the edity=1 marker cookie.
 import { effect } from '@preact/signals';
 import { render } from 'preact';
+import { markup } from '../markup.js';
 import { getSession } from './api.js';
 import { editorRoot, readPage } from './documents.js';
 import { draftStore, keepDraft, type DraftStore } from './draft-store.js';
@@ -17,7 +18,7 @@ import { watchLimits, type Limits } from './watch-limits.js';
 // cookie too, so the inline check loads this bundle there as well. In the
 // phone preview's frame, the Editor of the page around it shows the Draft.
 if (window.top === window) void start();
-else if (window.frameElement?.hasAttribute('data-edity-preview')) {
+else if (window.frameElement?.hasAttribute(markup.preview)) {
   void startPreview();
 }
 
