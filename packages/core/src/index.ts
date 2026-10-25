@@ -1,6 +1,9 @@
 export { defineFields, definitionOf, list, number, text } from './fields.js';
 export { graphemeCount } from './graphemes.js';
+export { toJSONSchema } from './json-schema.js';
+export type { JSONSchema } from './json-schema.js';
 export type {
+  AnyFieldDefinitions,
   Definition,
   Field,
   FieldDefinitions,
