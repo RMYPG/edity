@@ -53,7 +53,8 @@ run = ["pnpm exec tsc -p tsconfig.json", "pnpm -r typecheck"]
 
 [tasks.test]
 description = "Run every package's tests with Vitest, and the contracts module's with Go"
-depends = ["deps"]
+# The integration's tests build Sites with the Editor bundle from dist/.
+depends = ["build"]
 run = ["pnpm exec vitest run", "go -C contracts test ./..."]
 
 [tasks.build]
