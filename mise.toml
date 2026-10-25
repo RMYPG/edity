@@ -2,6 +2,9 @@
 # Listed before node: corepack's pnpm shim in node's bin would otherwise shadow this pinned version.
 "npm:pnpm" = "11.1.2"
 node = "24"
+jactionlint = "2.3.0"
+# jactionlint checks workflow scripts with it.
+shellcheck = "0.11.0"
 
 [tasks.deps]
 description = "Install npm dependencies from the lockfile"
@@ -15,9 +18,9 @@ sources = [
 outputs = { auto = true }
 
 [tasks.lint]
-description = "Lint the code with ESLint"
+description = "Lint the code with ESLint and the GitHub workflows with jactionlint"
 depends = ["deps"]
-run = "pnpm exec eslint ."
+run = ["pnpm exec eslint .", "jactionlint"]
 
 [tasks.format]
 description = "Format every file with Prettier"
