@@ -3,5 +3,7 @@
   "compilerOptions": {
     "noEmit": true
   },
-  "include": ["src", "test/*.ts", "*.ts"]
+  "include": ["src", "test/*.ts", "*.ts"],
+  // The Editor has its own tsconfig.json, for the browser.
+  "exclude": ["src/editor"]
 }

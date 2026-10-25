@@ -16,7 +16,7 @@ export default [
   },
   {
     ...eslint.configs.recommended,
-    files: ['**/*.{js,mjs,cjs,ts,mts,cts}'],
+    files: ['**/*.{js,mjs,cjs,ts,mts,cts,tsx}'],
   },
   ...tseslint.configs.recommended,
   ...eslintPluginAstro.configs.recommended,

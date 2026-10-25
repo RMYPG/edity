@@ -31,8 +31,8 @@
     "!src/**/*.test.ts"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && vite build -c vite.editor.config.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/editor/tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {
@@ -43,7 +43,10 @@
     "zod": "^4.6.0"
   },
   "devDependencies": {
+    "@preact/signals": "^2.11.3",
     "astro": "^7.4.2",
+    "preact": "^11.0.1",
+    "vite": "^8.3.5",
     "zod": "^4.6.7"
   },
   "publishConfig": {
