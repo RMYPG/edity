@@ -1,14 +1,16 @@
 # 28. Connect fisioindoor to Edity
 
-Status: ready-for-human
+Status: needs-info
 Repo: RMYPG/fisioindoor
 Milestone: M6
 Blocked by: 06, 26, 27
 Covers: N8 (see the [spec](../spec.md))
 
+On hold: the platform's deployment model is changing.
+
 ## What to build
 
-Follow the N8 steps for the pilot Site: install the `edity` App on `fisioindoor`, add its Site entry, tunnel routes and Zitadel role, add the release workflow, and do a real Publish with the Client.
+Follow the N8 steps for the pilot Site: install the `edity-publisher` App on `fisioindoor`, add its Site entry, tunnel routes and Zitadel role, add the release workflow, and do a real Publish with the Client.
 
 ## Acceptance criteria
 

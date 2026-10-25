@@ -121,7 +121,7 @@ Must means version one is not usable without it. Should means it belongs in vers
 | --- | --- | --- |
 | V1 | The server validates every Change against the page's Field definitions, read from the Site repository at `main` HEAD, and accepts only known Fields and Lists | Must |
 | V2 | A Change whose stored value differs from the "before" value sent by the browser is rejected as a Conflict; other Changes still merge, and conflicting ones stay in the Draft | Must |
-| V3 | One Publish produces one commit on top of the validated HEAD, containing the content changes and a patch bump of `package.json`. The commit is authored by the `edity` GitHub App, and its message lists the changed Fields and carries an `Edity-Client` trailer | Must |
+| V3 | One Publish produces one commit on top of the validated HEAD, containing the content changes and a patch bump of `package.json`. The commit is authored by the `edity-publisher` GitHub App, and its message lists the changed Fields and carries an `Edity-Client` trailer | Must |
 | V4 | The server writes only to the content files and `package.json` of Site repositories it is configured for | Must |
 | V5 | Publishing is rate-limited per Site | Should |
 | V6 | When a Release fails, the server opens or updates a GitHub issue on the Site repository | Must |
@@ -150,7 +150,7 @@ Failed-login throttling is handled by Zitadel.
 | N5 | Works in current Chrome, Edge, Safari (including iOS) and Firefox 136 or later | Must |
 | N6 | The Editor's own text is translatable, with Spanish and English to start; its language follows the Client's Zitadel locale, independent of the Site's language | Should |
 | N7 | All controls are reachable by keyboard and labelled for screen readers | Should |
-| N8 | Adding Edity to a Site means: Migration, installing the `edity` GitHub App on the repository, adding the tunnel routes, adding the Site's Zitadel role and adding the Site entry to the server config in `platform` | Must |
+| N8 | Adding Edity to a Site means: Migration, installing the `edity-publisher` GitHub App on the repository, adding the tunnel routes, adding the Site's Zitadel role and adding the Site entry to the server config in `platform` | Must |
 | N9 | The TS and Go validators pass the same conformance fixtures (JSON Schema Test Suite format) from `edity/contracts` | Must |
 | N10 | The server's HTTP API is described in OpenAPI, owned by `edity-server`; the Editor's client is generated from it | Must |
 | N11 | Pact consumer contracts from the Editor are verified in `edity-server`'s CI through the shared Pact Broker | Must |
@@ -166,7 +166,7 @@ All routes are on the Site's own origin.
 | `POST /_edity/api/auth/logout` | End the session and clear both cookies |
 | `GET /_edity/api/session` | The Client's name, locale and Site, or 401 |
 | `POST /_edity/api/publish` | `{ page, changes: [{ path, before, after }] }` returns `202 { sha, version, conflicts? }`, `409 { conflicts }` when nothing merged, `422 { violations }`, or `401` |
-| `GET /_edity/api/publish/:sha` | `{ stage: validating \| releasing \| deploying \| live \| failed, version }` |
+| `GET /_edity/api/publish/:sha` | `{ stage: validating \| releasing \| released \| deploying \| live \| failed, version }` (`deploying` and `live` are on hold, ticket 33) |
 
 ## Build order
 
@@ -183,11 +183,13 @@ Each milestone ends with something you can try. Development publishes only to `R
 | M6. Site pipeline | The release-on-Publish workflow lands in the template and `edity-sandbox`; `fisioindoor` is connected | 1 day |
 | M7. Device pass | Tested with Spanish accents and emoji, iOS Safari, Android Chrome, translation and grammar extensions | 1.5 to 2 days |
 
-The work is split into tickets in [`issues/`](issues/): 01 to 29 for v1, and 30 to 32 for the deferred backlog.
+The work is split into tickets in [`issues/`](issues/): 01 to 29 and 33 for v1, and 30 to 32 for the deferred backlog.
 
 Estimates are rough guesses for one developer, about 13 to 18 days in total. M2 is the experiment: it is where the time is best spent, and it can be shown to a Client before M4 exists.
 
 **Platform dependencies**
+
+On hold: the platform's deployment model is changing, so work focuses on the application itself. The deployment-side items below, and tickets 28 and 33, wait for the new model.
 
 - [RMYPG/platform#39](https://github.com/RMYPG/platform/issues/39): Flux image automation. M5's Deploying and Live stages only end once Releases deploy automatically.
 - [RMYPG/platform#41](https://github.com/RMYPG/platform/issues/41): self-hosted Pact Broker, needed for N11 in M4.
@@ -219,7 +221,7 @@ Estimates are rough guesses for one developer, about 13 to 18 days in total. M2 
 | Editor UI library | Preact 11 with signals, rendered into one shadow root |
 | npm scope | `@edity` if the npm org can be created, otherwise `@rmypg/edity-*` |
 | Licenses | MPL-2.0 for `edity` and its packages, AGPL-3.0 for `edity-server` |
-| GitHub Apps | One: `edity`, installed on Site repositories (contents write, issues write, actions, checks and metadata read) |
+| GitHub Apps | One: `edity-publisher`, installed on Site repositories (contents write, issues write, actions, checks and metadata read), with no webhook in v1: progress is polled, which keeps the server stateless and needs no public URL |
 
 ## Deferred backlog
 

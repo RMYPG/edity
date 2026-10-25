@@ -8,7 +8,7 @@ Covers: V2, V3, V4, V5, S7, P3 (see the [spec](../spec.md))
 
 ## What to build
 
-Implement `POST /_edity/api/publish`. As the `edity` GitHub App: read the page's content and generated JSON Schema from `main` HEAD, validate (ticket 19), detect Conflicts per Change (a structural List Change conflicts if any part of the stored List differs from `before`), apply the Changes that merge, bump the patch version in `package.json`, and create one commit on top of that exact HEAD. The commit message lists the changed Fields and ends with an `Edity-Client: <Zitadel user>` trailer. Write only to the Site's content files and `package.json`. Rate-limit per Site.
+Implement `POST /_edity/api/publish`. As the `edity-publisher` GitHub App: read the page's content and generated JSON Schema from `main` HEAD, validate (ticket 19), detect Conflicts per Change (a structural List Change conflicts if any part of the stored List differs from `before`), apply the Changes that merge, bump the patch version in `package.json`, and create one commit on top of that exact HEAD. The commit message lists the changed Fields and ends with an `Edity-Client: <Zitadel user>` trailer. Write only to the Site's content files and `package.json`. Rate-limit per Site.
 
 ## Acceptance criteria
 

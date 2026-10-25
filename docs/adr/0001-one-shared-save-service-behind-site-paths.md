@@ -11,3 +11,5 @@ Sites are static images served by `static-web-server` on the cluster, so none of
 ## Consequences
 
 Site hostnames are routed by Pulumi (the tunnel's static-site list), not by gitops, so adding a Site's `/_edity/*` route is a Pulumi change.
+
+The decision is the shared server on each Site's own origin. Routing it through Cloudflare Tunnel path rules is provisional, because the platform's deployment model is changing.

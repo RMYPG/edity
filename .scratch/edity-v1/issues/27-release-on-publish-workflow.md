@@ -7,7 +7,7 @@ Covers: V3 (see the [spec](../spec.md))
 
 ## What to build
 
-Add a workflow to the Site template that runs the existing release logic automatically when CI succeeds on `main` for a commit authored by the `edity` App, so every Publish becomes a Release without the Developer. Copy it to `edity-sandbox`.
+Add a workflow to the Site template that runs the existing release logic automatically when CI succeeds on `main` for a commit authored by the `edity-publisher` App (`edity-publisher[bot]`), so every Publish becomes a Release without the Developer. Copy it to `edity-sandbox`.
 
 ## Acceptance criteria
 
