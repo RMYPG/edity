@@ -237,7 +237,7 @@ function watchDocument(
     running.frame = undefined;
     const { window, resizes, observed } = running;
     const narrow = running.narrow.matches;
-    const changes = [...draft.changes.peek().keys()];
+    const changes = [...draft.changes.peek().values()];
     const focused = document.activeElement?.closest(field);
     const next: LimitMark[] = [];
     const seen = new Set<HTMLElement>();
@@ -264,7 +264,7 @@ function watchDocument(
           ? { lines: countLines(element), narrow }
           : undefined,
       );
-      const stands = standing(counts, isChanged(path, changes));
+      const stands = standing(counts, isChanged(path, changes, page.content));
       look(element, stands);
       seen.add(element);
       if (stands === 'within' || (stands === 'near' && element !== focused)) {
