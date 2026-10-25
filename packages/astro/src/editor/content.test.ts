@@ -12,7 +12,6 @@ import {
   fieldAt,
   fieldChange,
   isWellFormed,
-  pathPattern,
   sameValue,
   valueAt,
 } from './content.js';
@@ -124,14 +123,6 @@ describe('sameValue', () => {
     expect(sameValue([plan], [{ ...plan }])).toBe(true);
     expect(sameValue('12', 12)).toBe(false);
     expect(sameValue(['a'], { 0: 'a' })).toBe(false);
-  });
-});
-
-describe('pathPattern', () => {
-  test('stands for the same Field in every Item', () => {
-    expect(pathPattern('plans.1.features.0')).toBe('plans.*.features.*');
-    expect(pathPattern('services.12')).toBe('services.*');
-    expect(pathPattern('hero.title')).toBe('hero.title');
   });
 });
 

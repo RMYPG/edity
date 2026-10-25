@@ -7,6 +7,7 @@ import {
 } from '@edity/core';
 import type * as z from 'zod/v4';
 import { markup } from './markup.js';
+import { childPath, keysOf, pathOf } from './paths.js';
 
 /**
  * The value of a `data-edity-*` attribute: `<h1
@@ -231,12 +232,12 @@ function walk(
   data: unknown,
   path: string,
 ): [Definition | undefined, unknown] {
-  const keys = path.split('.');
+  const keys = keysOf(path);
   let definition: Definition | undefined = root;
   let value = data;
   for (const [index, key] of keys.entries()) {
     if (definition?.kind === 'list') {
-      const list = keys.slice(0, index).join('.');
+      const list = pathOf(keys.slice(0, index));
       throw new Error(
         `[edity] "${path}" is inside the List "${list}" in page "${page.name}": mark it through its Item, with item.field() or item.list() in <Items>`,
       );
@@ -306,7 +307,7 @@ function item(
   value: unknown,
   index: number,
 ): AnyItem {
-  const path = `${listPath}.${index}`;
+  const path = childPath(listPath, index);
   const shape = definition.item;
   return {
     path: page.enabled ? path : undefined,
@@ -315,12 +316,12 @@ function item(
     field(key) {
       return shape.kind === 'text'
         ? field(page, path, shape)
-        : field(page, `${path}.${key}`, shapeAt(shape, key));
+        : field(page, childPath(path, String(key)), shapeAt(shape, key));
     },
     list(key) {
       return list(
         page,
-        `${path}.${key}`,
+        childPath(path, key),
         shape.kind === 'object' ? shapeAt(shape, key) : undefined,
         (value as Record<string, unknown>)[key],
       );

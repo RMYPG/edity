@@ -6,6 +6,7 @@ import {
   type NumberDefinition,
   type TextLimits,
 } from '@edity/core';
+import { isWithin, itemIndexIn } from '../paths.js';
 import { valueAt } from './content.js';
 import type { Change, ContentValue } from './draft.js';
 import { originsOf } from './list-changes.js';
@@ -160,12 +161,18 @@ export function isChanged(
   content: unknown,
 ): boolean {
   for (const change of changes) {
+    if (!isWithin(path, change.path)) continue;
     if (path === change.path) return true;
-    if (!path.startsWith(`${change.path}.`)) continue;
     const built = valueAt(content, change.path);
-    if (!Array.isArray(change.after) || !Array.isArray(built)) return true;
-    const [index = ''] = path.slice(change.path.length + 1).split('.');
-    return originsOf(built, change.after)[Number(index)] === undefined;
+    const index = itemIndexIn(path, change.path);
+    if (
+      !Array.isArray(change.after) ||
+      !Array.isArray(built) ||
+      index === undefined
+    ) {
+      return true;
+    }
+    return originsOf(built, change.after)[index] === undefined;
   }
   return false;
 }

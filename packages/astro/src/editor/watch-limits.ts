@@ -16,6 +16,7 @@ import {
 } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
 import { markedPath, markup, selector } from '../markup.js';
+import { pathUnder } from '../paths.js';
 import { fieldAt, valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
 import type { Fields } from './fields.js';
@@ -301,9 +302,8 @@ function watchDocument(
     // the Draft's, or the built one.
     for (const change of draft.changes.peek().values()) {
       if (change.path === path) return change.after;
-      if (path.startsWith(`${change.path}.`)) {
-        return valueAt(change.after, path.slice(change.path.length + 1));
-      }
+      const under = pathUnder(path, change.path);
+      if (under !== undefined) return valueAt(change.after, under);
     }
     return valueAt(page.content, path);
   }

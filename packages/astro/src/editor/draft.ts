@@ -1,4 +1,5 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
+import { isIndex, isWithin, keysOf, pathUnder } from '../paths.js';
 import { sameValue, valueAt } from './content.js';
 
 /**
@@ -82,8 +83,8 @@ export class Draft {
    * (see `keepBefore`).
    */
   replace(path: string, changes: Iterable<Change>): void {
-    const replaced = [...this.#changes.value.values()].filter(
-      (change) => change.path === path || change.path.startsWith(`${path}.`),
+    const replaced = [...this.#changes.value.values()].filter((change) =>
+      isWithin(change.path, path),
     );
     const next = new Map(
       [...changes].map((change) => [change.path, keepBefore(change, replaced)]),
@@ -91,7 +92,7 @@ export class Draft {
     const kept = new Map<string, Change>();
     let same = true;
     for (const [at, change] of this.#changes.value) {
-      if (at !== path && !at.startsWith(`${path}.`)) {
+      if (!isWithin(at, path)) {
         kept.set(at, change);
         continue;
       }
@@ -131,12 +132,12 @@ function keepBefore(change: Change, replaced: readonly Change[]): Change {
   if (same !== undefined) return { ...change, before: same.before };
   let before = change.before;
   for (const each of replaced) {
-    if (each.path.startsWith(`${change.path}.`)) {
-      const at = each.path.slice(change.path.length + 1);
-      before = withValueAt(before, at.split('.'), each.before);
-    } else if (change.path.startsWith(`${each.path}.`)) {
-      const at = change.path.slice(each.path.length + 1);
-      before = valueAt(each.before, at) ?? before;
+    const under = pathUnder(each.path, change.path);
+    const above = pathUnder(change.path, each.path);
+    if (under !== undefined) {
+      before = withValueAt(before, keysOf(under), each.before);
+    } else if (above !== undefined) {
+      before = valueAt(each.before, above) ?? before;
     }
   }
   return before === change.before ? change : { ...change, before };
@@ -152,7 +153,7 @@ function withValueAt(
   if (key === undefined) return inner;
   if (typeof value !== 'object' || !Object.hasOwn(value, key)) return value;
   if (Array.isArray(value)) {
-    if (!/^\d+$/.test(key)) return value;
+    if (!isIndex(key)) return value;
     const copy: ContentValue[] = [...(value as readonly ContentValue[])];
     copy[Number(key)] = withValueAt(copy[Number(key)]!, rest, inner);
     return copy;

@@ -20,16 +20,15 @@ import {
 } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
 import { markedPath, markup, pathAttributes, selector } from '../markup.js';
+import { childPath, itemPathOf, listPathOf, rebased } from '../paths.js';
 import { valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
 import { dropIndex, sameRow } from './drop.js';
 import type { Fields } from './fields.js';
 import {
   blankValue,
-  itemPathOf,
   listAt,
   listChanges,
-  listPathOf,
   originsOf,
   type ItemNow,
   type ListNow,
@@ -345,7 +344,7 @@ function editPage(
     key: string,
   ): HTMLElement | undefined {
     const list = element.querySelector<HTMLElement>(
-      selector(markup.list, `${markedPath(element, markup.item)}.${key}`),
+      selector(markup.list, childPath(markedPath(element, markup.item), key)),
     );
     return list !== null && lists.has(list) ? list : undefined;
   }
@@ -445,7 +444,7 @@ function editPage(
     for (const [key, each] of Object.entries(definition.item.shape)) {
       const shown = values[key] ?? blankValue(each);
       if (each.kind !== 'list') {
-        fields.show(`${path}.${key}`, shown, root);
+        fields.show(childPath(path, key), shown, root);
         continue;
       }
       const list = nestedList(element, key);
@@ -1083,7 +1082,7 @@ function renumber(list: HTMLElement): void {
   const path = markedPath(list, markup.list);
   itemsOf(list).forEach((element, index) => {
     const from = markedPath(element, markup.item);
-    const to = `${path}.${index}`;
+    const to = childPath(path, index);
     if (from !== to) rewrite(element, from, to);
   });
 }
@@ -1100,9 +1099,8 @@ function rewrite(root: Element | DocumentFragment, from: string, to: string) {
   for (const element of elements) {
     for (const name of pathAttributes) {
       const value = element.getAttribute(name);
-      if (value !== null && (value === from || value.startsWith(`${from}.`))) {
-        element.setAttribute(name, to + value.slice(from.length));
-      }
+      const moved = value === null ? undefined : rebased(value, from, to);
+      if (moved !== undefined) element.setAttribute(name, moved);
     }
     if (element.localName === 'template') {
       rewrite((element as HTMLTemplateElement).content, from, to);

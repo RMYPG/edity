@@ -9,6 +9,7 @@ import type {
   TextDefinition,
 } from '@edity/core';
 import type { PageMarker } from '../editable.js';
+import { childPath } from '../paths.js';
 import { definitionAt, fieldChange, sameValue, valueAt } from './content.js';
 import type { Change, ContentValue } from './draft.js';
 
@@ -40,35 +41,6 @@ export function listAt(
 }
 
 /**
- * The path of the outermost List that `path` is inside: `plans` for
- * `plans.1.features.0` and for `plans.1.features`. `undefined` for a path
- * outside Lists, such as `hero.title` or `plans` itself.
- */
-export function listPathOf(path: string): string | undefined {
-  const keys = path.split('.');
-  const index = keys.findIndex((key) => /^\d+$/.test(key));
-  if (index > 0) return keys.slice(0, index).join('.');
-  return undefined;
-}
-
-/**
- * The Item a Field at `path` belongs to, and the Field's key in it: `plans.1`
- * and `price` for `plans.1.price`, `services.2` and `''` for `services.2`.
- * `undefined` outside Lists.
- */
-export function itemPathOf(
-  path: string,
-): { readonly item: string; readonly key: string } | undefined {
-  const keys = path.split('.');
-  const index = keys.findLastIndex((key) => /^\d+$/.test(key));
-  if (index < 1) return undefined;
-  return {
-    item: keys.slice(0, index + 1).join('.'),
-    key: keys.slice(index + 1).join('.'),
-  };
-}
-
-/**
  * The Changes the List at `path` makes when the page shows it as `list`,
  * with `before` from the page's built content (P3).
  */
@@ -88,7 +60,7 @@ export function listChanges(
     return sameValue(before, after) ? [] : [{ path, before, after }];
   }
   return list.items.flatMap((item, index) =>
-    itemChanges(page, definition.item, `${path}.${index}`, item),
+    itemChanges(page, definition.item, childPath(path, index), item),
   );
 }
 
@@ -101,7 +73,7 @@ function itemChanges(
   if (definition.kind === 'text') return changed(page, path, item.value);
   const value = item.value as { readonly [key: string]: ContentValue };
   return Object.entries(definition.shape).flatMap(([key, field]) => {
-    const at = `${path}.${key}`;
+    const at = childPath(path, key);
     if (field.kind !== 'list') return changed(page, at, value[key]);
     // A List the template does not show is as built.
     const shown = item.lists?.[key];

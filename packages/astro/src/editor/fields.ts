@@ -9,7 +9,8 @@
 import { effect, untracked } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
 import { markedPath, markup, selector } from '../markup.js';
-import { fieldAt, fieldChange, pathPattern, valueAt } from './content.js';
+import { pathPattern } from '../paths.js';
+import { fieldAt, fieldChange, valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
 import css from './fields.css?inline';
 import type { EditorState } from './state.js';
