@@ -19,6 +19,8 @@ export interface Messages {
   readonly visitorView: string;
   /** Leaves the visitor view. */
   readonly backToEditing: string;
+  /** Shows the page at a phone's width, with the Draft (P6). */
+  readonly phonePreview: string;
   /** A Field's counter: one Limit its value is near or over (L3 to L5). */
   limit(count: Count): string;
   /** A counter on a Field that broke the Limit as published (L7). */
@@ -44,6 +46,7 @@ const messages: Readonly<Record<Locale, Messages>> = {
     publish: 'Publicar',
     visitorView: 'Vista de visitante',
     backToEditing: 'Volver a editar',
+    phonePreview: 'Vista de móvil',
     limit(count) {
       switch (count.limit) {
         case 'chars':
@@ -81,6 +84,7 @@ const messages: Readonly<Record<Locale, Messages>> = {
     publish: 'Publish',
     visitorView: 'Visitor view',
     backToEditing: 'Back to editing',
+    phonePreview: 'Phone preview',
     limit(count) {
       switch (count.limit) {
         case 'chars':
