@@ -6,6 +6,7 @@ import { getSession } from './api.js';
 import { Editor } from './Editor.js';
 import css from './editor.css?inline';
 import { editFields, type Fields } from './fields.js';
+import { editLists, type Lists } from './lists.js';
 import { createEditorState, type EditorState } from './state.js';
 
 // Only the top window runs the Editor. A same-origin frame, such as ticket
@@ -31,7 +32,8 @@ async function start(): Promise<void> {
         page: readPage(),
         languages: navigator.languages,
       });
-      mount(state, editFields(state));
+      const fields = editFields(state);
+      mount(state, fields, editLists(state, fields));
       return;
     }
     case 'signed-out':
@@ -46,7 +48,7 @@ async function start(): Promise<void> {
 }
 
 /** Renders the Editor into one open shadow root, after the page's <body>. */
-function mount(state: EditorState, fields: Fields): void {
+function mount(state: EditorState, fields: Fields, lists: Lists): void {
   // One unknown tag, which no Site CSS selects by name. The root is open so
   // browser tests can reach inside.
   const host = document.createElement('edity-root');
@@ -58,7 +60,7 @@ function mount(state: EditorState, fields: Fields): void {
   // Not in <body>, where it would change what the Site's :last-child and
   // flex or grid rules apply to.
   document.documentElement.append(host);
-  render(<Editor state={state} fields={fields} />, shadow);
+  render(<Editor state={state} fields={fields} lists={lists} />, shadow);
 }
 
 /** Resolves once the browser has parsed the page: import() can come first. */

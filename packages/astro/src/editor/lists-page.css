@@ -1,0 +1,12 @@
+/*
+ * What the Editor adds to the Site's own Lists while editing (S2). The
+ * document adopts this sheet in the edit view only.
+ *
+ * A mouse drags an Item from anywhere outside its text, so the pointer says
+ * so. Fields keep the text cursor fields.css gives them.
+ */
+@media (hover: hover) and (pointer: fine) {
+  [data-edity-list] > [data-edity-item] {
+    cursor: grab;
+  }
+}

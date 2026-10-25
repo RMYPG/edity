@@ -1,5 +1,6 @@
 // The Editor's own text, in every language it speaks (N6). Its language
 // follows the Client's, never the Site's.
+import { listMessages, type ListMessages } from './lists-i18n.js';
 
 /** A language the Editor speaks. */
 export type Locale = 'es' | 'en';
@@ -18,6 +19,8 @@ export interface Messages {
   readonly visitorView: string;
   /** Leaves the visitor view. */
   readonly backToEditing: string;
+  /** The List controls' text. */
+  readonly lists: ListMessages;
 }
 
 const messages: Readonly<Record<Locale, Messages>> = {
@@ -34,6 +37,7 @@ const messages: Readonly<Record<Locale, Messages>> = {
     publish: 'Publicar',
     visitorView: 'Vista de visitante',
     backToEditing: 'Volver a editar',
+    lists: listMessages.es,
   },
   en: {
     bar: 'Edity Editor',
@@ -48,6 +52,7 @@ const messages: Readonly<Record<Locale, Messages>> = {
     publish: 'Publish',
     visitorView: 'Visitor view',
     backToEditing: 'Back to editing',
+    lists: listMessages.en,
   },
 };
 
