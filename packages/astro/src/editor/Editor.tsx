@@ -55,6 +55,7 @@ export function Editor({ state, fields, lists, limits }: Props) {
             preview={preview}
           />
           <Counters limits={limits} t={state.t} />
+          <NotApplied state={state} />
           {preview.value && (
             <Preview
               state={state}
@@ -128,6 +129,23 @@ function Bar({ state, fields, lists, focus, preview }: BarProps) {
           <span class="label">{t.visitorView}</span>
         </button>
       </span>
+    </div>
+  );
+}
+
+/**
+ * Tells the Client how many Changes of the Draft kept in the browser no
+ * longer apply (P2), above the bar, until they close it.
+ */
+function NotApplied({ state }: { readonly state: EditorState }) {
+  const { notApplied, t } = state;
+  if (notApplied.value === 0) return null;
+  return (
+    <div class="notice" role="status">
+      <span>{t.notApplied(notApplied.value)}</span>
+      <button type="button" onClick={() => (notApplied.value = 0)}>
+        {t.dismiss}
+      </button>
     </div>
   );
 }
