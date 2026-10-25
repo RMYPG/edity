@@ -1,5 +1,5 @@
+import { edityPage } from '@edity/astro/loaders';
 import { defineFields, list, number, text } from '@edity/core';
-import { glob } from 'astro/loaders';
 import { defineCollection } from 'astro:content';
 
 /** The Field definitions of the home page. */
@@ -35,8 +35,5 @@ export const homeFields = defineFields({
 });
 
 export const collections = {
-  home: defineCollection({
-    loader: glob({ pattern: 'home.json', base: './src/content' }),
-    schema: homeFields,
-  }),
+  home: defineCollection({ loader: edityPage(homeFields) }),
 };

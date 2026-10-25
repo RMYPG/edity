@@ -23,6 +23,11 @@
       "types": "./dist/editable.d.ts",
       "default": "./dist/editable.js"
     },
+    "./loaders": {
+      "@edity/source": "./src/loaders.ts",
+      "types": "./dist/loaders.d.ts",
+      "default": "./dist/loaders.js"
+    },
     "./Items.astro": "./src/Items.astro"
   },
   "files": [
