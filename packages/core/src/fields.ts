@@ -1,5 +1,6 @@
 import * as z from 'zod/v4';
 import { graphemeCount } from './graphemes.js';
+import { decimalPlaces, oneVisibleLine } from './violations.js';
 
 // ---------------------------------------------------------------------------
 // Limits and definitions: plain, JSON-serialisable data read back from a
@@ -184,16 +185,6 @@ export type AnyFieldDefinitions = z.ZodType & {
 // Primitives
 
 /**
- * What every text Field holds: one line with at least one visible character.
- * Blank means `\t`, `\v`, `\f` or a space separator (Unicode Zs), and a line
- * break is `\n`, `\r`, U+2028 or U+2029. Zod emits this as the JSON Schema
- * `pattern`, which ECMA-262 (with the `u` flag) and Go's RE2 read alike, so it
- * avoids `\s` and `\u` escapes, whose meaning differs between the two.
- */
-const oneVisibleLine =
-  /^[\t\v\f\p{Zs}]*[^\t\v\f\p{Zs}\n\r\p{Zl}\p{Zp}][^\n\r\p{Zl}\p{Zp}]*$/u;
-
-/**
  * A text Field: one line of at most `maxChars` visible characters, with at
  * least one. Its line Limits are kept on its definition for the Editor, which
  * measures the rendered lines.
@@ -262,16 +253,6 @@ export function number(limits: NumberLimits): NumberField {
     kind: 'number',
     limits: Object.freeze({ min, max, decimals }),
   }) as NumberField;
-}
-
-/**
- * Counts the decimal places in the shortest decimal form of `value`, the one
- * JavaScript prints and JSON stores: 19.99 has 2, and 0.1 + 0.2 has 17.
- */
-function decimalPlaces(value: number): number {
-  const [mantissa = '', exponent = '0'] = String(value).split('e');
-  const fraction = mantissa.split('.')[1] ?? '';
-  return Math.max(0, fraction.length - Number(exponent));
 }
 
 /**
