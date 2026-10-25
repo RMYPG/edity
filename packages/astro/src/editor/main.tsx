@@ -7,12 +7,12 @@ import { getSession } from './api.js';
 import { editorRoot, readPage } from './documents.js';
 import { draftStore, keepDraft, type DraftStore } from './draft-store.js';
 import { Editor } from './Editor.js';
-import { editFields, type Fields } from './fields.js';
-import { editLists, type Lists } from './lists.js';
+import { editFields } from './fields.js';
+import { editLists } from './lists.js';
 import { previewReady } from './Preview.js';
 import { restoreDraft } from './show-draft.js';
-import { createEditorState, type EditorState } from './state.js';
-import { watchLimits, type Limits } from './watch-limits.js';
+import { createEditorState, type Editing } from './state.js';
+import { watchLimits } from './watch-limits.js';
 
 // Only the top window runs the Editor. A same-origin frame sends the marker
 // cookie too, so the inline check loads this bundle there as well. In the
@@ -46,10 +46,14 @@ async function start(): Promise<void> {
         changes: store?.load(),
       });
       const fields = editFields(state);
-      const lists = editLists(state, fields);
-      const limits = watchLimits(state, fields);
-      if (store !== undefined) restore(state, fields, lists, store);
-      mount(state, fields, lists, limits);
+      const editing: Editing = {
+        state,
+        fields,
+        lists: editLists(state, fields),
+        limits: watchLimits(state, fields),
+      };
+      if (store !== undefined) restore(editing, store);
+      mount(editing);
       return;
     }
     case 'signed-out':
@@ -77,13 +81,9 @@ async function startPreview(): Promise<void> {
  * Shows the Draft kept in the browser on the page, tells the Client how many
  * of its Changes no longer apply, and keeps the Draft there from now on.
  */
-function restore(
-  { draft, notApplied }: EditorState,
-  fields: Fields,
-  lists: Lists,
-  store: DraftStore,
-): void {
-  notApplied.value = restoreDraft(draft, fields, lists);
+function restore(editing: Editing, store: DraftStore): void {
+  const { draft, notApplied } = editing.state;
+  notApplied.value = restoreDraft(editing);
   keepDraft(draft, store);
   // The notice is about the Draft as restored: it goes once the Client
   // changes it.
@@ -94,16 +94,8 @@ function restore(
 }
 
 /** Renders the Editor into one open shadow root, after the page's <body>. */
-function mount(
-  state: EditorState,
-  fields: Fields,
-  lists: Lists,
-  limits: Limits,
-): void {
-  render(
-    <Editor state={state} fields={fields} lists={lists} limits={limits} />,
-    editorRoot(document),
-  );
+function mount(editing: Editing): void {
+  render(<Editor editing={editing} />, editorRoot(document));
 }
 
 /** Resolves once the browser has parsed the page: import() can come first. */

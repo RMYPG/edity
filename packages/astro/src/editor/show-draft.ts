@@ -5,9 +5,8 @@
 import { batch } from '@preact/signals';
 import { markup, selector } from '../markup.js';
 import { sameValue, valueAt } from './content.js';
-import type { Change, Draft } from './draft.js';
-import type { Fields } from './fields.js';
-import type { Lists } from './lists.js';
+import type { Change } from './draft.js';
+import type { Editing } from './state.js';
 
 /**
  * Shows each Change's `after` in `root`, in order: a List Change as the
@@ -18,8 +17,7 @@ import type { Lists } from './lists.js';
  * one to a Field the Site no longer has.
  */
 export function showDraft(
-  fields: Fields,
-  lists: Lists,
+  { fields, lists }: Pick<Editing, 'fields' | 'lists'>,
   changes: Iterable<Change>,
   root: ParentNode = document,
 ): Change[] {
@@ -57,12 +55,9 @@ function shows(root: ParentNode, { path, after }: Change): boolean {
  * Shows a Draft restored from the browser on the page (P2), and drops the
  * Changes to Fields and Lists it no longer has. Returns how many it dropped.
  */
-export function restoreDraft(
-  draft: Draft,
-  fields: Fields,
-  lists: Lists,
-): number {
-  const missing = showDraft(fields, lists, draft.changes.peek().values());
+export function restoreDraft(editing: Editing): number {
+  const { draft } = editing.state;
+  const missing = showDraft(editing, draft.changes.peek().values());
   batch(() => {
     for (const { path } of missing) draft.remove(path);
   });

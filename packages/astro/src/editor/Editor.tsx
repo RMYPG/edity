@@ -1,26 +1,22 @@
 import { useSignal, type Signal } from '@preact/signals';
 import { useEffect, useRef } from 'preact/hooks';
 import { Counters } from './Counters.js';
-import type { Fields } from './fields.js';
 import { ListControls } from './ListControls.js';
-import type { Lists } from './lists.js';
 import { Preview, PreviewToggle } from './Preview.js';
 import { asBuilt, showDraft } from './show-draft.js';
-import type { EditorState } from './state.js';
-import type { Limits } from './watch-limits.js';
+import type { Editing, EditorState } from './state.js';
 
 interface Props {
-  readonly state: EditorState;
-  /** The Site's Fields, which Discard puts back as built. */
-  readonly fields: Fields;
-  /** The Site's Lists, which Discard puts back as built. */
-  readonly lists: Lists;
-  /** The Limits of the Site's Fields, whose counters show here. */
-  readonly limits: Limits;
+  /**
+   * The Editor at work on the page: Discard puts its Fields and Lists back
+   * as built, and its Limits' counters show here.
+   */
+  readonly editing: Editing;
 }
 
 /** The Editor's controls, rendered into its shadow root. */
-export function Editor({ state, fields, lists, limits }: Props) {
+export function Editor({ editing }: Props) {
+  const { state, lists, limits } = editing;
   // A view that appears after the first render came from the Client's
   // click, so it takes the focus the other view's button had.
   const started = useRef(false);
@@ -34,55 +30,34 @@ export function Editor({ state, fields, lists, limits }: Props) {
   return (
     <div class="edity" lang={state.locale}>
       {state.view.value === 'visitor' ? (
-        <BackToEditing
-          state={state}
-          fields={fields}
-          lists={lists}
-          limits={limits}
-          focus={focus}
-        />
+        <BackToEditing state={state} focus={focus} />
       ) : (
         <>
           {/* Lets the end of the page scroll clear of the bar. */}
           <div class="spacer" />
           <ListControls state={state} lists={lists} />
-          <Bar
-            state={state}
-            fields={fields}
-            lists={lists}
-            limits={limits}
-            focus={focus}
-            preview={preview}
-          />
+          <Bar editing={editing} focus={focus} preview={preview} />
           <Counters limits={limits} t={state.t} />
           <NotApplied state={state} />
-          {preview.value && (
-            <Preview
-              state={state}
-              fields={fields}
-              lists={lists}
-              limits={limits}
-              open={preview}
-            />
-          )}
+          {preview.value && <Preview editing={editing} open={preview} />}
         </>
       )}
     </div>
   );
 }
 
-interface ViewProps extends Props {
+interface ViewProps {
   /** Whether to focus the view's button when it appears. */
   readonly focus: boolean;
 }
 
-interface BarProps extends ViewProps {
+interface BarProps extends Props, ViewProps {
   /** Whether the phone preview shows. */
   readonly preview: Signal<boolean>;
 }
 
-function Bar({ state, fields, lists, focus, preview }: BarProps) {
-  const { session, page, t, draft, view, publishDisabled } = state;
+function Bar({ editing, focus, preview }: BarProps) {
+  const { session, page, t, draft, view, publishDisabled } = editing.state;
   const count = draft.count.value;
   const visitorView = useFocusOnMount(focus);
 
@@ -105,8 +80,7 @@ function Bar({ state, fields, lists, focus, preview }: BarProps) {
           const dropped = draft.discard();
           // The page as built, which a Change's `before` may not be (V2).
           showDraft(
-            fields,
-            lists,
+            editing,
             dropped.map((change) => asBuilt(change, page?.content)),
           );
         }}
@@ -150,7 +124,10 @@ function NotApplied({ state }: { readonly state: EditorState }) {
   );
 }
 
-function BackToEditing({ state, focus }: ViewProps) {
+function BackToEditing({
+  state,
+  focus,
+}: ViewProps & { readonly state: EditorState }) {
   const button = useFocusOnMount(focus);
   return (
     <button
