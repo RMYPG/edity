@@ -1,8 +1,9 @@
 ---
 // The home page of the fixture Site. It holds one of each shape the Editor
 // handles: text Fields (some inside a link and a button), number Fields
-// formatted by the template, a value shown in two places, a List of text
-// Fields and a List of Items with Fields and a nested List.
+// formatted by the template, a value shown in two places (once inside a
+// link), a List of text Fields and a List of Items with Fields and a nested
+// List.
 import { editable } from '@edity/astro/editable';
 import Items from '@edity/astro/Items.astro';
 import { getEntry } from 'astro:content';
@@ -137,7 +138,10 @@ const count = new Intl.NumberFormat('es-ES');
 
     <footer class="footer">
       <p>
-        © <span data-edity-field={home.field('brand.name')}>{brand.name}</span>
+        ©
+        <a href="/">
+          <span data-edity-field={home.field('brand.name')}>{brand.name}</span>
+        </a>
       </p>
     </footer>
   </body>
@@ -156,6 +160,9 @@ const count = new Intl.NumberFormat('es-ES');
     max-width: 960px;
     margin: 0 auto;
     padding: 0 24px;
+  }
+  .footer a {
+    color: inherit;
   }
   h1 {
     max-width: 16ch;
