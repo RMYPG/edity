@@ -21,7 +21,8 @@ import { numberValue, type FieldDefinition } from './values.js';
 export type Count =
   | {
       readonly limit: 'chars' | 'lines';
-      readonly count: number;
+      /** The visible characters or lines the value takes. */
+      readonly used: number;
       readonly max: number;
     }
   | { readonly limit: 'min' | 'max'; readonly bound: number }
@@ -30,7 +31,7 @@ export type Count =
 /** Whether `count` is over its Limit, rather than near it. */
 export function isOver(count: Count): boolean {
   return count.limit === 'chars' || count.limit === 'lines'
-    ? count.count > count.max
+    ? count.used > count.max
     : true;
 }
 
@@ -73,12 +74,12 @@ function textCounts(
   const counts: Count[] = [];
   const chars = graphemeCount(value);
   if (chars * 5 >= limits.maxChars * 4) {
-    counts.push({ limit: 'chars', count: chars, max: limits.maxChars });
+    counts.push({ limit: 'chars', used: chars, max: limits.maxChars });
   }
   if (rendered !== undefined) {
     const max = lineLimit(limits, rendered.narrow);
     if (max !== undefined && rendered.lines > max) {
-      counts.push({ limit: 'lines', count: rendered.lines, max });
+      counts.push({ limit: 'lines', used: rendered.lines, max });
     }
   }
   return counts;

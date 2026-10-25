@@ -17,7 +17,7 @@ export interface DraftStore {
    */
   load(): Change[];
   /** Keeps `changes` for the page, or forgets its Draft when there are none. */
-  save(changes: Iterable<Change>): void;
+  keep(changes: Iterable<Change>): void;
 }
 
 /** What is kept under a Draft's key, as JSON. */
@@ -53,7 +53,7 @@ export function draftStore(
       }
       return (kept as Kept).changes.filter(isChange);
     },
-    save(changes) {
+    keep(changes) {
       const kept: Kept = { changes: [...changes] };
       try {
         if (kept.changes.length === 0) storage().removeItem(key);
@@ -69,7 +69,7 @@ export function draftStore(
 export function keepDraft(draft: Draft, store: DraftStore): () => void {
   return effect(() => {
     const changes = draft.changes.value;
-    untracked(() => store.save(changes.values()));
+    untracked(() => store.keep(changes.values()));
   });
 }
 

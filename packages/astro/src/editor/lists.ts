@@ -234,7 +234,7 @@ function editPage(
   }
   const resized = new ResizeObserver(relayout);
 
-  const definitionOf = (list: HTMLElement): ListDefinition | undefined =>
+  const listDefinition = (list: HTMLElement): ListDefinition | undefined =>
     listAt(page.fields, markedPath(list, markup.list));
 
   /**
@@ -255,7 +255,7 @@ function editPage(
 
   /** The Editor's own model of `list` and its Items. */
   function register(list: HTMLElement, built: boolean): void {
-    const definition = definitionOf(list);
+    const definition = listDefinition(list);
     if (definition === undefined) return;
     const path = markedPath(list, markup.list);
     const content = valueAt(page.content, path);
@@ -307,7 +307,7 @@ function editPage(
   // The Draft
 
   function listNow(list: HTMLElement): ListNow {
-    const definition = definitionOf(list);
+    const definition = listDefinition(list);
     return {
       items: itemsOf(list).map((element) => itemNow(element, definition)),
     };
@@ -400,7 +400,7 @@ function editPage(
     const element = list.ownerDocument.importNode(template.content, true)
       .firstElementChild as HTMLElement | null;
     if (element === null) return undefined;
-    const definition = definitionOf(list);
+    const definition = listDefinition(list);
     items.set(element, {
       id: ++ids,
       origin: undefined,
@@ -425,7 +425,7 @@ function editPage(
   /** Shows `value` in the Item `element`: its Fields and its List. */
   function fill(element: HTMLElement, value: ContentValue): void {
     const model = items.get(element);
-    const definition = definitionOf(listOf(element));
+    const definition = listDefinition(listOf(element));
     if (model === undefined || definition === undefined) return;
     model.value = structuredClone(value);
     const path = markedPath(element, markup.item);
@@ -448,7 +448,7 @@ function editPage(
 
   function showList(list: HTMLElement, value: readonly ContentValue[]): void {
     const model = lists.get(list);
-    const definition = definitionOf(list);
+    const definition = listDefinition(list);
     if (model === undefined || definition === undefined) return;
     const origins = originsOf(model.values, value);
     // New Items on the page are used before new ones from the template.
@@ -482,7 +482,7 @@ function editPage(
     index: number,
     value?: ContentValue,
   ): HTMLElement | undefined {
-    const definition = definitionOf(list);
+    const definition = listDefinition(list);
     if (
       definition === undefined ||
       itemsOf(list).length >= definition.limits.max
@@ -504,7 +504,7 @@ function editPage(
 
   function remove(element: HTMLElement): boolean {
     const list = listOf(element);
-    const definition = definitionOf(list);
+    const definition = listDefinition(list);
     const elements = itemsOf(list);
     if (definition === undefined || elements.length <= definition.limits.min) {
       return false;
@@ -568,7 +568,7 @@ function editPage(
     dismissUndo();
     if (removed === undefined) return;
     const { element, list, index } = removed;
-    const definition = definitionOf(list);
+    const definition = listDefinition(list);
     if (
       !list.isConnected ||
       definition === undefined ||
@@ -597,7 +597,7 @@ function editPage(
       return undefined;
     }
     const list = listOf(item);
-    const definition = definitionOf(list);
+    const definition = listDefinition(list);
     if (definition?.item.kind !== 'text') return undefined;
     return { field: element, item, list, definition, text: definition.item };
   }
@@ -902,7 +902,7 @@ function editPage(
     }
     const shownLists = around.flatMap((list) => {
       const model = lists.get(list);
-      const definition = definitionOf(list);
+      const definition = listDefinition(list);
       if (model === undefined || definition === undefined) return [];
       const within = itemOf(list.parentElement);
       return [
@@ -923,7 +923,7 @@ function editPage(
 
   function itemControl(element: HTMLElement): ItemControl | undefined {
     const model = items.get(element);
-    const definition = definitionOf(listOf(element));
+    const definition = listDefinition(listOf(element));
     if (model === undefined || definition === undefined) return undefined;
     const elements = itemsOf(listOf(element));
     const index = elements.indexOf(element);

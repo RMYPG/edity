@@ -23,16 +23,16 @@ describe('characters (L1, L4)', () => {
     expect(text.length).toBe(27);
 
     expect(limitCounts(call, text)).toEqual([
-      { limit: 'chars', count: 10, max: 10 },
+      { limit: 'chars', used: 10, max: 10 },
     ]);
     expect(limitCounts(call, `${text}!`)).toEqual([
-      { limit: 'chars', count: 11, max: 10 },
+      { limit: 'chars', used: 11, max: 10 },
     ]);
   });
 
   test('show from 80% of the Limit on', () => {
     expect(limitCounts(call, 'Llámanos')).toEqual([
-      { limit: 'chars', count: 8, max: 10 },
+      { limit: 'chars', used: 8, max: 10 },
     ]);
     expect(limitCounts(call, 'Llámalos')).toHaveLength(1);
     expect(limitCounts(call, 'Llámame')).toEqual([]);
@@ -46,7 +46,7 @@ describe('lines (L2)', () => {
     const text = '\u00f1n\u0303👨‍👩‍👧‍👦🇪🇸👍🏽 años';
     expect(limitCounts(title, text, { lines: 2, narrow: false })).toEqual([]);
     expect(limitCounts(title, text, { lines: 3, narrow: false })).toEqual([
-      { limit: 'lines', count: 3, max: 2 },
+      { limit: 'lines', used: 3, max: 2 },
     ]);
     expect(limitCounts(call, 'Hola', { lines: 1, narrow: false })).toEqual([]);
   });
@@ -54,7 +54,7 @@ describe('lines (L2)', () => {
   test('take the narrow value on a narrow screen', () => {
     expect(limitCounts(title, 'Hola', { lines: 3, narrow: true })).toEqual([]);
     expect(limitCounts(title, 'Hola', { lines: 4, narrow: true })).toEqual([
-      { limit: 'lines', count: 4, max: 3 },
+      { limit: 'lines', used: 4, max: 3 },
     ]);
   });
 
@@ -70,8 +70,8 @@ describe('lines (L2)', () => {
     expect(
       limitCounts(title, 'x'.repeat(50), { lines: 3, narrow: false }),
     ).toEqual([
-      { limit: 'lines', count: 3, max: 2 },
-      { limit: 'chars', count: 50, max: 60 },
+      { limit: 'lines', used: 3, max: 2 },
+      { limit: 'chars', used: 50, max: 60 },
     ]);
   });
 });
@@ -111,8 +111,8 @@ describe('numbers (L5)', () => {
 });
 
 describe('standing (L3, L7)', () => {
-  const over: Count = { limit: 'chars', count: 11, max: 10 };
-  const near: Count = { limit: 'chars', count: 9, max: 10 };
+  const over: Count = { limit: 'chars', used: 11, max: 10 };
+  const near: Count = { limit: 'chars', used: 9, max: 10 };
 
   test('a Field over a Limit is red only when the Draft changed it', () => {
     expect(standing([over], true)).toBe('over');

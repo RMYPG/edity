@@ -67,8 +67,8 @@ const messages: Readonly<Record<Locale, Messages>> = {
         case 'chars':
         case 'lines': {
           const unit = count.limit === 'lines' ? ' líneas' : '';
-          const extra = count.count - count.max;
-          return `${count.count}/${count.max}${unit}${
+          const extra = count.used - count.max;
+          return `${count.used}/${count.max}${unit}${
             extra <= 0 ? '' : extra === 1 ? ' · sobra 1' : ` · sobran ${extra}`
           }`;
         }
@@ -111,8 +111,8 @@ const messages: Readonly<Record<Locale, Messages>> = {
         case 'chars':
         case 'lines': {
           const unit = count.limit === 'lines' ? ' lines' : '';
-          const extra = count.count - count.max;
-          return `${count.count}/${count.max}${unit}${
+          const extra = count.used - count.max;
+          return `${count.used}/${count.max}${unit}${
             extra <= 0 ? '' : ` · ${extra} too many`
           }`;
         }

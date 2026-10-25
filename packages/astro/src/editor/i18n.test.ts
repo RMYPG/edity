@@ -30,23 +30,23 @@ describe('Limit counters (L3 to L5)', () => {
   const en = messagesFor('en');
 
   test('show visible characters, and the excess once over', () => {
-    expect(es.limit({ limit: 'chars', count: 20, max: 24 })).toBe('20/24');
-    expect(es.limit({ limit: 'chars', count: 25, max: 24 })).toBe(
+    expect(es.limit({ limit: 'chars', used: 20, max: 24 })).toBe('20/24');
+    expect(es.limit({ limit: 'chars', used: 25, max: 24 })).toBe(
       '25/24 · sobra 1',
     );
-    expect(es.limit({ limit: 'chars', count: 27, max: 24 })).toBe(
+    expect(es.limit({ limit: 'chars', used: 27, max: 24 })).toBe(
       '27/24 · sobran 3',
     );
-    expect(en.limit({ limit: 'chars', count: 27, max: 24 })).toBe(
+    expect(en.limit({ limit: 'chars', used: 27, max: 24 })).toBe(
       '27/24 · 3 too many',
     );
   });
 
   test('show lines with their unit', () => {
-    expect(es.limit({ limit: 'lines', count: 3, max: 2 })).toBe(
+    expect(es.limit({ limit: 'lines', used: 3, max: 2 })).toBe(
       '3/2 líneas · sobra 1',
     );
-    expect(en.limit({ limit: 'lines', count: 5, max: 3 })).toBe(
+    expect(en.limit({ limit: 'lines', used: 5, max: 3 })).toBe(
       '5/3 lines · 2 too many',
     );
   });

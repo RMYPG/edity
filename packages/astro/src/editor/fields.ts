@@ -106,7 +106,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   /** A focused number Field's last text that was a number (E5). */
   const lastNumber = new WeakMap<HTMLElement, Typed>();
 
-  const definitionOf = (element: HTMLElement) =>
+  const fieldDefinition = (element: HTMLElement) =>
     fieldAt(page.fields, markedPath(element, markup.field));
 
   /** The editable Field an event happened in. */
@@ -125,7 +125,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   }
 
   function makeEditable(element: HTMLElement): void {
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     if (definition === undefined) return;
     if (!editable.has(element)) {
       editable.set(
@@ -170,7 +170,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   /** Records what the Client did to `element`'s Field, after any input. */
   function changed(element: HTMLElement): void {
     const path = markedPath(element, markup.field);
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     if (definition === undefined) return;
     const text = element.textContent ?? '';
     const elements = elementsOf(document, path);
@@ -202,7 +202,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   }
 
   function focused(element: HTMLElement): void {
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     if (definition?.kind === 'number') {
       // Thousands separators would read as decimal separators, so the
       // Client edits `12.000` as `12000` (E5).
@@ -240,7 +240,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     if (
       element === undefined ||
       element === document.activeElement ||
-      definitionOf(element)?.kind !== 'number'
+      fieldDefinition(element)?.kind !== 'number'
     ) {
       return;
     }
@@ -265,7 +265,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     atFocus.delete(element);
     lastNumber.delete(element);
     const path = markedPath(element, markup.field);
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     if (definition === undefined) return;
     const text = element.textContent ?? '';
     const value = fieldValue(definition, text);
@@ -279,20 +279,20 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
           ? String(value)
           : text;
     const elements = elementsOf(document, path);
-    let changes = false;
+    let reformatted = false;
     for (const each of elements) {
       if (each.textContent !== shown) {
         each.textContent = shown;
-        changes = true;
+        reformatted = true;
       }
     }
-    if (changes) notify(path, definition, value, elements);
+    if (reformatted) notify(path, definition, value, elements);
   }
 
   /** Called after every input, once any composition has ended. */
   function typed(element: HTMLElement): void {
     flatten(element);
-    if (definitionOf(element)?.kind === 'number') {
+    if (fieldDefinition(element)?.kind === 'number') {
       const text = element.textContent ?? '';
       const last = lastNumber.get(element);
       // An IME or a dead key can insert what beforeinput could not refuse.
@@ -364,7 +364,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
       element.blur();
       return;
     }
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     if (definition?.kind !== 'number' || !insertions.has(event.inputType)) {
       return;
     }
@@ -379,7 +379,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     // plain-text elements.
     event.preventDefault();
     const pasted = event.clipboardData?.getData('text/plain') ?? '';
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     let text = pastedText(pasted);
     if (definition?.kind === 'number') {
       const selection = selectionIn(element);
@@ -445,7 +445,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
       // Changing the text while an IME composes would break it: wait for
       // compositionend. Text Fields still follow along.
       if (!(event as InputEvent).isComposing) typed(element);
-      else if (definitionOf(element)?.kind === 'text') changed(element);
+      else if (fieldDefinition(element)?.kind === 'text') changed(element);
     });
     on('compositionend', forField(typed));
     on('paste', paste);
