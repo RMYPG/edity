@@ -1,6 +1,9 @@
+import { batch } from '@preact/signals';
 import { useEffect, useRef } from 'preact/hooks';
 import { Counters } from './Counters.js';
 import type { Fields } from './fields.js';
+import { ListControls } from './ListControls.js';
+import type { Lists } from './lists.js';
 import type { EditorState } from './state.js';
 import type { Limits } from './watch-limits.js';
 
@@ -8,12 +11,14 @@ interface Props {
   readonly state: EditorState;
   /** The Site's Fields, which Discard puts back as built. */
   readonly fields: Fields;
+  /** The Site's Lists, which Discard puts back as built. */
+  readonly lists: Lists;
   /** The Limits of the Site's Fields, whose counters show here. */
   readonly limits: Limits;
 }
 
 /** The Editor's controls, rendered into its shadow root. */
-export function Editor({ state, fields, limits }: Props) {
+export function Editor({ state, fields, lists, limits }: Props) {
   // A view that appears after the first render came from the Client's
   // click, so it takes the focus the other view's button had.
   const started = useRef(false);
@@ -28,6 +33,7 @@ export function Editor({ state, fields, limits }: Props) {
         <BackToEditing
           state={state}
           fields={fields}
+          lists={lists}
           limits={limits}
           focus={focus}
         />
@@ -35,7 +41,14 @@ export function Editor({ state, fields, limits }: Props) {
         <>
           {/* Lets the end of the page scroll clear of the bar. */}
           <div class="spacer" />
-          <Bar state={state} fields={fields} limits={limits} focus={focus} />
+          <ListControls state={state} lists={lists} />
+          <Bar
+            state={state}
+            fields={fields}
+            lists={lists}
+            limits={limits}
+            focus={focus}
+          />
           <Counters limits={limits} t={state.t} />
         </>
       )}
@@ -48,7 +61,7 @@ interface ViewProps extends Props {
   readonly focus: boolean;
 }
 
-function Bar({ state, fields, focus }: ViewProps) {
+function Bar({ state, fields, lists, focus }: ViewProps) {
   const { session, t, draft, view, publishDisabled } = state;
   const count = draft.count.value;
   const visitorView = useFocusOnMount(focus);
@@ -69,10 +82,13 @@ function Bar({ state, fields, focus }: ViewProps) {
         class="discard"
         disabled={count === 0}
         onClick={() => {
-          // TODO(ticket 13): put back the Lists whose structure changed.
-          for (const { path, before } of draft.discard()) {
-            fields.show(path, before);
-          }
+          const dropped = draft.discard();
+          // Lists first: until a List is back as built, the paths of its
+          // Fields may point at other Items. Each ignores the other's paths.
+          batch(() => {
+            for (const { path, before } of dropped) lists.show(path, before);
+            for (const { path, before } of dropped) fields.show(path, before);
+          });
         }}
       >
         {t.discard}

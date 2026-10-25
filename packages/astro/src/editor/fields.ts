@@ -5,7 +5,7 @@
 //
 // Listeners sit on the document and find the Field from the event's target,
 // and paths are read from `data-edity-field` on each event, so Items that
-// ticket 13 adds, moves or renumbers need nothing but `connect()`.
+// lists.ts adds, moves or renumbers need nothing but `connect()`.
 import { effect, untracked } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
 import { fieldAt, fieldChange, pathPattern, valueAt } from './content.js';
@@ -174,9 +174,9 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   }
 
   function record(path: string, value: ContentValue): void {
-    // TODO(ticket 13): a Field inside a List whose structure the Draft
-    // changed updates that List's Change instead (S7), and so does a Field
-    // of an Item added in this Draft, which has no built value.
+    // A Field in an Item is lists.ts's to record, from `onInput`: it is a
+    // Change of its own only while its List's structure is as built (S7).
+    if (pathPattern(path) !== path) return;
     if (valueAt(page.content, path) === undefined) return;
     const change = fieldChange(page, path, value);
     if (change === undefined) draft.remove(path);

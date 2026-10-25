@@ -1,6 +1,7 @@
 // The Editor's own text, in every language it speaks (N6). Its language
 // follows the Client's, never the Site's.
 import type { Count } from './limits.js';
+import { listMessages, type ListMessages } from './lists-i18n.js';
 
 /** A language the Editor speaks. */
 export type Locale = 'es' | 'en';
@@ -23,6 +24,8 @@ export interface Messages {
   limit(count: Count): string;
   /** A counter on a Field that broke the Limit as published (L7). */
   published(limit: string): string;
+  /** The List controls' text. */
+  readonly lists: ListMessages;
 }
 
 const numbers = {
@@ -67,6 +70,7 @@ const messages: Readonly<Record<Locale, Messages>> = {
       }
     },
     published: (limit) => `${limit} · ya publicado así`,
+    lists: listMessages.es,
   },
   en: {
     bar: 'Edity Editor',
@@ -104,6 +108,7 @@ const messages: Readonly<Record<Locale, Messages>> = {
       }
     },
     published: (limit) => `${limit} · already published`,
+    lists: listMessages.en,
   },
 };
 

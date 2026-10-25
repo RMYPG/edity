@@ -8,6 +8,7 @@ import {
 } from '@edity/core';
 import { describe, expect, test } from 'vitest';
 import {
+  definitionAt,
   fieldAt,
   fieldChange,
   isWellFormed,
@@ -76,6 +77,18 @@ describe('fieldAt', () => {
     ]) {
       expect(fieldAt(fields, path), path).toBeUndefined();
     }
+  });
+});
+
+describe('definitionAt', () => {
+  test('finds Lists, Items and groups too', () => {
+    expect(definitionAt(fields, 'plans')).toMatchObject({ kind: 'list' });
+    expect(definitionAt(fields, 'plans.1')).toMatchObject({ kind: 'object' });
+    expect(definitionAt(fields, 'hero')).toMatchObject({ kind: 'object' });
+    expect(definitionAt(fields, 'plans.1.features.0')).toMatchObject({
+      kind: 'text',
+    });
+    expect(definitionAt(fields, 'plans.x')).toBeUndefined();
   });
 });
 
@@ -159,5 +172,42 @@ describe('isWellFormed', () => {
     expect(isWellFormed(fields, { ...price, after: '' })).toBe(false);
     expect(isWellFormed(fields, { ...price, after: '13.000' })).toBe(false);
     expect(isWellFormed(fields, { ...price, after: Number.NaN })).toBe(false);
+  });
+
+  test("wants a List's Items within its bounds, with every Field well formed", () => {
+    const services = { path: 'services', before: content.services };
+    expect(isWellFormed(fields, { ...services, after: ['Uno', 'Dos'] })).toBe(
+      true,
+    );
+    expect(isWellFormed(fields, { ...services, after: ['Uno', ' '] })).toBe(
+      false,
+    );
+    expect(isWellFormed(fields, { ...services, after: [] })).toBe(false);
+    expect(
+      isWellFormed(fields, { ...services, after: Array(9).fill('Uno') }),
+    ).toBe(false);
+    expect(isWellFormed(fields, { ...services, after: 'Uno' })).toBe(false);
+
+    const plans = { path: 'plans', before: content.plans };
+    const plan = { name: 'Nuevo', price: 10, features: ['Una'] };
+    expect(isWellFormed(fields, { ...plans, after: [plan] })).toBe(true);
+    for (const broken of [
+      { ...plan, price: '' },
+      { ...plan, name: '' },
+      { ...plan, features: [] },
+      { ...plan, features: [''] },
+      ['Nuevo'],
+    ]) {
+      expect(isWellFormed(fields, { ...plans, after: [plan, broken] })).toBe(
+        false,
+      );
+    }
+    expect(
+      isWellFormed(fields, {
+        path: 'plans.0.features',
+        before: ['Una sesión al mes'],
+        after: ['Una', 'Dos'],
+      }),
+    ).toBe(true);
   });
 });
