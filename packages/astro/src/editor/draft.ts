@@ -1,4 +1,5 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
+import { valueAt } from './content.js';
 
 /**
  * A value in a page's content: a Field's text or number, or a List's Items.
@@ -17,13 +18,22 @@ export type ContentValue =
 export interface Change {
   /** A content path, such as `hero.title`, `plans.1.price` or `plans`. */
   readonly path: string;
-  /** The value in the content the page was built from. */
+  /**
+   * The value the Client changed: the one in the content the page was built
+   * from when they first made the Change. The Draft keeps it while the
+   * Change is recorded again, also after a reload, so the server can tell
+   * when a newer Release changed it too: a Conflict (V2).
+   */
   readonly before: ContentValue;
   /** The value in the Draft. */
   readonly after: ContentValue;
 }
 
-/** The Changes a Client has made on a page and not published yet. */
+/**
+ * The Changes a Client has made on a page and not published yet. A Change
+ * keeps the value before that the Client first changed, whatever `before`
+ * it is recorded again with.
+ */
 export class Draft {
   readonly #changes;
 
@@ -44,7 +54,11 @@ export class Draft {
 
   /** Records `change`, replacing any Change already recorded at its path. */
   record(change: Change): void {
-    this.#changes.value = new Map(this.#changes.value).set(change.path, change);
+    const recorded = this.#changes.value.get(change.path);
+    this.#changes.value = new Map(this.#changes.value).set(
+      change.path,
+      recorded === undefined ? change : { ...change, before: recorded.before },
+    );
   }
 
   /**
@@ -63,9 +77,17 @@ export class Draft {
    * of those recorded there: a List's Changes, which are one for the whole
    * List once its structure changes (S7), else those of its Fields. A path
    * that stays keeps its position, and new ones go last.
+   *
+   * Each new Change keeps the values before of those it takes the place of
+   * (see `keepBefore`).
    */
   replace(path: string, changes: Iterable<Change>): void {
-    const next = new Map([...changes].map((change) => [change.path, change]));
+    const replaced = [...this.#changes.value.values()].filter(
+      (change) => change.path === path || change.path.startsWith(`${path}.`),
+    );
+    const next = new Map(
+      [...changes].map((change) => [change.path, keepBefore(change, replaced)]),
+    );
     const kept = new Map<string, Change>();
     let same = true;
     for (const [at, change] of this.#changes.value) {
@@ -95,6 +117,48 @@ export class Draft {
     this.#changes.value = new Map();
     return dropped;
   }
+}
+
+/**
+ * `change` with the value before that the Client first changed, from the
+ * Changes it takes the place of: the one at its path, else those under it
+ * (a List Change in place of its Fields' Changes), put into its own value
+ * before, else the value at its path in one above it (a Field's Change in
+ * place of its List's). Parts they do not hold keep `change`'s own.
+ */
+function keepBefore(change: Change, replaced: readonly Change[]): Change {
+  const same = replaced.find((each) => each.path === change.path);
+  if (same !== undefined) return { ...change, before: same.before };
+  let before = change.before;
+  for (const each of replaced) {
+    if (each.path.startsWith(`${change.path}.`)) {
+      const at = each.path.slice(change.path.length + 1);
+      before = withValueAt(before, at.split('.'), each.before);
+    } else if (change.path.startsWith(`${each.path}.`)) {
+      const at = change.path.slice(each.path.length + 1);
+      before = valueAt(each.before, at) ?? before;
+    }
+  }
+  return before === change.before ? change : { ...change, before };
+}
+
+/** A copy of `value` holding `inner` at `keys`, if it has a value there. */
+function withValueAt(
+  value: ContentValue,
+  keys: readonly string[],
+  inner: ContentValue,
+): ContentValue {
+  const [key, ...rest] = keys;
+  if (key === undefined) return inner;
+  if (typeof value !== 'object' || !Object.hasOwn(value, key)) return value;
+  if (Array.isArray(value)) {
+    if (!/^\d+$/.test(key)) return value;
+    const copy: ContentValue[] = [...(value as readonly ContentValue[])];
+    copy[Number(key)] = withValueAt(copy[Number(key)]!, rest, inner);
+    return copy;
+  }
+  const object = value as { readonly [key: string]: ContentValue };
+  return { ...object, [key]: withValueAt(object[key]!, rest, inner) };
 }
 
 function sameChange(a: Change, b: Change): boolean {
