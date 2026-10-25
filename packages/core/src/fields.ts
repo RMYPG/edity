@@ -16,7 +16,7 @@ export interface TextLimits {
 }
 
 export interface NumberLimits {
-  /** Smallest value allowed, inclusive. */
+  /** Smallest value allowed, inclusive: 0 or more. */
   readonly min: number;
   /** Largest value allowed, inclusive. */
   readonly max: number;
@@ -229,9 +229,18 @@ export function text(limits: TextLimits): TextField {
   }) as TextField;
 }
 
-/** A number Field, from `min` to `max` with at most `decimals` decimal places. */
+/**
+ * A number Field, from `min` to `max` with at most `decimals` decimal places.
+ * The Client types it as digits and one decimal separator (E5), so `min` is 0
+ * or more: the Editor takes no minus sign.
+ */
 export function number(limits: NumberLimits): NumberField {
   const min = finiteNumber('min', limits.min);
+  if (min < 0) {
+    throw new RangeError(
+      `min must be at least 0, got ${min}: the Editor takes digits and one decimal separator in a number Field, and no minus sign`,
+    );
+  }
   const max = finiteNumber('max', limits.max);
   ordered(min, max);
   const decimals = wholeNumber('decimals', limits.decimals, 0);
