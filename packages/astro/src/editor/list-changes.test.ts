@@ -47,7 +47,12 @@ const content = {
   footer: { links: [] },
 };
 
-const page = { page: 'home', fields, content };
+const page = {
+  page: 'home',
+  fields,
+  content,
+  narrowScreens: '(width < 600px)',
+};
 
 /** The Items of a List as built, in their places, with `values` in them. */
 function asBuilt(values: readonly ContentValue[]): ListNow {
