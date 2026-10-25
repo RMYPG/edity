@@ -6,6 +6,11 @@ export default mergeConfig(
   defineProject({
     test: {
       name: '@edity/core',
+      // Also run the type-level tests in `*.test-d.ts` through tsc.
+      typecheck: {
+        enabled: true,
+        tsconfig: './tsconfig.json',
+      },
     },
   }),
 );
