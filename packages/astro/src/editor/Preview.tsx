@@ -14,6 +14,7 @@ import type { Change } from './draft.js';
 import type { Fields } from './fields.js';
 import type { Messages } from './i18n.js';
 import type { Lists } from './lists.js';
+import { adoptSheet } from './sheets.js';
 import { draftDelta, showDraft } from './show-draft.js';
 import type { EditorState } from './state.js';
 import type { Limits } from './watch-limits.js';
@@ -138,11 +139,10 @@ function showPage(
 ): () => void {
   // A desktop's scroll bar would take some 15 px of the 390, and a phone's
   // takes none.
-  const sheet = new document.defaultView!.CSSStyleSheet();
-  sheet.replaceSync(
+  adoptSheet(
+    document,
     'html { scrollbar-width: none } html::-webkit-scrollbar { display: none }',
   );
-  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
   // A link in the frame can lead to another page, which shows as published:
   // the Draft is this page's.
   if (page === undefined || readPage(document)?.page !== page.page) {

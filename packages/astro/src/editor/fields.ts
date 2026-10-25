@@ -6,12 +6,12 @@
 // Listeners sit on the document and find the Field from the event's target,
 // and paths are read from `data-edity-field` on each event, so Items that
 // lists.ts adds, moves or renumbers need nothing but `connect()`.
-import { effect, untracked } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
 import { markedPath, markup, selector } from '../markup.js';
 import { pathPattern } from '../paths.js';
 import { fieldAt, fieldChange, valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
+import { whileEditing, type On } from './edit-view.js';
 import css from './fields.css?inline';
 import {
   offsetAtPoint,
@@ -20,6 +20,7 @@ import {
   selectionIn,
   type Selected,
 } from './selection.js';
+import { adoptSheet } from './sheets.js';
 import type { EditorState } from './state.js';
 import {
   fieldValue,
@@ -98,8 +99,6 @@ export function editFields(state: EditorState): Fields {
 function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   const listeners = new Set<(input: FieldInput) => void>();
   const formatOf = numberFormats(page);
-  const sheet = new CSSStyleSheet();
-  sheet.replaceSync(css);
   /** Editable elements, with the attributes they had before. */
   const editable = new WeakMap<HTMLElement, Map<string, string | null>>();
   /** A focused Field's text when the caret entered it, for Escape (E4). */
@@ -427,14 +426,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     return at === -1 ? undefined : all[at + step];
   }
 
-  function start(): () => void {
-    const listening = new AbortController();
-    const { signal } = listening;
-    const on = <K extends keyof DocumentEventMap>(
-      type: K,
-      listener: (event: DocumentEventMap[K]) => void,
-      capture = false,
-    ) => document.addEventListener(type, listener, { signal, capture });
+  function start(on: On): () => void {
     const forField =
       (handle: (element: HTMLElement) => void) => (event: Event) => {
         const element = fieldOf(event.target);
@@ -461,27 +453,20 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     // A middle click would open the link in a new tab.
     on('auxclick', guard, true);
 
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    const removeSheet = adoptSheet(document, css);
     connect(document);
 
     return () => {
       // Leaving a Field commits it, while the listeners still run.
       const active = fieldOf(document.activeElement);
       active?.blur();
-      listening.abort();
-      document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
-        (each) => each !== sheet,
-      );
+      removeSheet();
       connect(document);
     };
   }
 
   // The visitor view (P7) leaves the page as a visitor sees it.
-  effect(() => {
-    if (view.value !== 'edit') return;
-    const stop = untracked(start);
-    return () => untracked(stop);
-  });
+  whileEditing(view, start);
 
   return {
     connect,

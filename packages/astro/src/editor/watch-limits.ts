@@ -18,6 +18,7 @@ import type { PageMarker } from '../editable.js';
 import { markedPath, markup, selector } from '../markup.js';
 import { fieldAt } from './content.js';
 import type { ContentValue } from './draft.js';
+import { whileEditing } from './edit-view.js';
 import type { Fields } from './fields.js';
 import {
   limitCounts,
@@ -28,6 +29,7 @@ import {
 } from './limits.js';
 import css from './limits.css?inline';
 import { blockOf, countLines, textBox } from './lines.js';
+import { adoptSheet } from './sheets.js';
 import type { EditorState } from './state.js';
 import { fieldValue, type FieldDefinition } from './values.js';
 
@@ -129,15 +131,11 @@ function watchPage(
     untracked(scheduleAll);
   });
   // The visitor view (P7) leaves every Field as the Site built it.
-  effect(() => {
-    if (state.view.value !== 'edit') return;
-    untracked(() => {
-      for (const watcher of watchers.values()) watcher.start();
-    });
-    return () =>
-      untracked(() => {
-        for (const watcher of watchers.values()) watcher.stop();
-      });
+  whileEditing(state.view, () => {
+    for (const watcher of watchers.values()) watcher.start();
+    return () => {
+      for (const watcher of watchers.values()) watcher.stop();
+    };
   });
   watch(document);
 
@@ -161,7 +159,7 @@ function watchDocument(
         readonly narrow: MediaQueryList;
         readonly resizes: ResizeObserver;
         readonly observed: WeakSet<Element>;
-        readonly sheet: CSSStyleSheet;
+        readonly removeSheet: () => void;
         readonly listening: AbortController;
         frame: number | undefined;
       }
@@ -172,10 +170,7 @@ function watchDocument(
     if (running !== undefined || window === null) return;
     const listening = new AbortController();
     const options = { signal: listening.signal, passive: true };
-    // From the document's own window, which a frame's elements need.
-    const sheet = new window.CSSStyleSheet();
-    sheet.replaceSync(css);
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    const removeSheet = adoptSheet(document, css);
     const narrow = window.matchMedia(page.narrowScreens);
     // Lines change with the width, and when a font arrives. Safari fires no
     // `loadingdone` and can resolve `fonts.ready` early, but a font that
@@ -186,7 +181,7 @@ function watchDocument(
       narrow,
       resizes,
       observed: new WeakSet(),
-      sheet,
+      removeSheet,
       listening,
       frame: undefined,
     };
@@ -214,15 +209,13 @@ function watchDocument(
 
   function stop(): void {
     if (running === undefined) return;
-    const { window, resizes, sheet, listening, frame } = running;
+    const { window, resizes, removeSheet, listening, frame } = running;
     running = undefined;
     listening.abort();
     resizes.disconnect();
     if (frame !== undefined) window.cancelAnimationFrame(frame);
     for (const element of [...marked.keys()]) look(element, 'within');
-    document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
-      (each) => each !== sheet,
-    );
+    removeSheet();
     marks = [];
     update(false);
   }

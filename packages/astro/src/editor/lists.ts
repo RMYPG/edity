@@ -10,20 +10,14 @@
 // list-changes.ts): one for the whole List once its structure changed, else
 // one for each Field the Client edited in it.
 import type { ListDefinition } from '@edity/core';
-import {
-  batch,
-  computed,
-  effect,
-  signal,
-  untracked,
-  type ReadonlySignal,
-} from '@preact/signals';
+import { batch, computed, signal, type ReadonlySignal } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
 import { markedPath, markup, pathAttributes, selector } from '../markup.js';
 import { childPath, itemPathOf, listPathOf, rebased } from '../paths.js';
 import { valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
 import { dropIndex, sameRow } from './drop.js';
+import { whileEditing, type On } from './edit-view.js';
 import type { Fields } from './fields.js';
 import {
   listAt,
@@ -35,6 +29,7 @@ import {
 } from './list-changes.js';
 import css from './lists-page.css?inline';
 import { caretIn, clickInto, selectionIn } from './selection.js';
+import { adoptSheet } from './sheets.js';
 import type { EditorState } from './state.js';
 import { fieldValue } from './values.js';
 
@@ -204,8 +199,6 @@ function editPage(
   const items = new WeakMap<HTMLElement, ItemModel>();
   const lists = new WeakMap<HTMLElement, ListModel>();
   let ids = 0;
-  const sheet = new CSSStyleSheet();
-  sheet.replaceSync(css);
 
   const layout = signal(0);
   const hovered = signal<HTMLElement | undefined>(undefined);
@@ -971,16 +964,7 @@ function editPage(
 
   // -------------------------------------------------------------------------
 
-  function start(): () => void {
-    const listening = new AbortController();
-    const { signal: aborted } = listening;
-    const on = <K extends keyof DocumentEventMap>(
-      type: K,
-      listener: (event: DocumentEventMap[K]) => void,
-      capture = false,
-    ) =>
-      document.addEventListener(type, listener, { signal: aborted, capture });
-
+  function start(on: On, signal: AbortSignal): () => void {
     on('pointerover', hover);
     on('pointerdown', press, true);
     on('pointermove', pointerMove, true);
@@ -991,18 +975,13 @@ function editPage(
     on('keydown', keydown, true);
     on('beforeinput', beforeInput, true);
     on('click', swallowClick, true);
-    window.addEventListener('resize', relayout, { signal: aborted });
-    document.fonts.addEventListener('loadingdone', relayout, {
-      signal: aborted,
-    });
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    window.addEventListener('resize', relayout, { signal });
+    document.fonts.addEventListener('loadingdone', relayout, { signal });
+    const removeSheet = adoptSheet(document, css);
 
     return () => {
       cancel();
-      listening.abort();
-      document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
-        (each) => each !== sheet,
-      );
+      removeSheet();
       hovered.value = undefined;
       touch(undefined);
     };
@@ -1011,11 +990,7 @@ function editPage(
   registerAll(document);
 
   // The visitor view (P7) leaves the Lists as a visitor sees them.
-  effect(() => {
-    if (view.value !== 'edit') return;
-    const stop = untracked(start);
-    return () => untracked(stop);
-  });
+  whileEditing(view, start);
 
   return {
     show(path, value, root = document) {

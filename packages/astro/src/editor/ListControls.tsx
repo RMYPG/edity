@@ -5,10 +5,11 @@
 //
 // They show for one Item at a time, so they cover little of the page: the
 // Item under the mouse, else the one last focused or tapped.
-import { useEffect, useRef } from 'preact/hooks';
+import { useRef } from 'preact/hooks';
 import type { ItemControl, ListControl, Lists, ListsUi } from './lists.js';
 import css from './lists.css?inline';
 import type { ListMessages } from './lists-i18n.js';
+import { useSheet } from './sheets.js';
 import type { EditorState } from './state.js';
 
 interface Props {
@@ -19,7 +20,7 @@ interface Props {
 export function ListControls({ state, lists }: Props) {
   const ui = lists.controls;
   const t = state.t.lists;
-  const root = useSheet(css);
+  const root = useSheet<HTMLDivElement>(css);
   const { lists: shown, item } = ui.shown();
   const dragged = ui.dragged.value;
   const removed = ui.removed.value;
@@ -170,24 +171,6 @@ function ItemBar({ ui, t, item }: BarProps & { readonly item: ItemControl }) {
       </button>
     </div>
   );
-}
-
-/** A ref for the controls' root, whose shadow root adopts `text` meanwhile. */
-function useSheet(text: string) {
-  const root = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const shadow = root.current?.getRootNode();
-    if (!(shadow instanceof ShadowRoot)) return;
-    const sheet = new CSSStyleSheet();
-    sheet.replaceSync(text);
-    shadow.adoptedStyleSheets = [...shadow.adoptedStyleSheets, sheet];
-    return () => {
-      shadow.adoptedStyleSheets = shadow.adoptedStyleSheets.filter(
-        (each) => each !== sheet,
-      );
-    };
-  }, []);
-  return root;
 }
 
 /** Where a box on the page goes, as the controls' root is at its origin. */

@@ -3,6 +3,7 @@
 import type { PageMarker } from '../editable.js';
 import { markup, selector } from '../markup.js';
 import css from './editor.css?inline';
+import { adoptSheet } from './sheets.js';
 
 /** What `document`'s `data-edity-page` marker holds, if it has one. */
 export function readPage(document: Document): PageMarker | undefined {
@@ -23,11 +24,7 @@ export function editorRoot(document: Document): ShadowRoot {
   // browser tests can reach inside.
   const host = document.createElement('edity-root');
   const shadow = host.attachShadow({ mode: 'open' });
-  // A constructed sheet, which a Site's CSP style-src does not apply to. It
-  // comes from the document's own window, as a frame's must.
-  const sheet = new document.defaultView!.CSSStyleSheet();
-  sheet.replaceSync(css);
-  shadow.adoptedStyleSheets = [sheet];
+  adoptSheet(shadow, css);
   // Not in <body>, where it would change what the Site's :last-child and
   // flex or grid rules apply to.
   document.documentElement.append(host);
