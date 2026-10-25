@@ -175,8 +175,19 @@ export interface FieldDefinitions<S extends Shape = Shape> extends z.ZodObject<
 // Primitives
 
 /**
- * A text Field of at most `maxChars` visible characters. Its line Limits are
- * kept on its definition for the Editor, which measures the rendered lines.
+ * What every text Field holds: one line with at least one visible character.
+ * Blank means `\t`, `\v`, `\f` or a space separator (Unicode Zs), and a line
+ * break is `\n`, `\r`, U+2028 or U+2029. Zod emits this as the JSON Schema
+ * `pattern`, which ECMA-262 (with the `u` flag) and Go's RE2 read alike, so it
+ * avoids `\s` and `\u` escapes, whose meaning differs between the two.
+ */
+const oneVisibleLine =
+  /^[\t\v\f\p{Zs}]*[^\t\v\f\p{Zs}\n\r\p{Zl}\p{Zp}][^\n\r\p{Zl}\p{Zp}]*$/u;
+
+/**
+ * A text Field: one line of at most `maxChars` visible characters, with at
+ * least one. Its line Limits are kept on its definition for the Editor, which
+ * measures the rendered lines.
  */
 export function text(limits: TextLimits): TextField {
   const checked: Mutable<TextLimits> = {
@@ -193,19 +204,25 @@ export function text(limits: TextLimits): TextField {
     );
   }
   const { maxChars } = checked;
-  const schema = z.string().check((ctx) => {
-    const count = graphemeCount(ctx.value);
-    if (count > maxChars) {
-      ctx.issues.push({
-        code: 'too_big',
-        origin: 'string',
-        maximum: maxChars,
-        inclusive: true,
-        input: ctx.value,
-        message: `Too long: expected at most ${maxChars} visible characters, got ${count}`,
-      });
-    }
-  });
+  const schema = z
+    .string()
+    .regex(oneVisibleLine, {
+      message:
+        'Invalid text: expected one line with at least one visible character',
+    })
+    .check((ctx) => {
+      const count = graphemeCount(ctx.value);
+      if (count > maxChars) {
+        ctx.issues.push({
+          code: 'too_big',
+          origin: 'string',
+          maximum: maxChars,
+          inclusive: true,
+          input: ctx.value,
+          message: `Too long: expected at most ${maxChars} visible characters, got ${count}`,
+        });
+      }
+    });
   return withDefinition(schema, {
     kind: 'text',
     limits: Object.freeze(checked),
