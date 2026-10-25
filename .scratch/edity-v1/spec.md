@@ -183,7 +183,7 @@ Each milestone ends with something you can try. Development publishes only to `R
 | M6. Site pipeline | The release-on-Publish workflow lands in the template and `edity-sandbox`; `fisioindoor` is connected | 1 day |
 | M7. Device pass | Tested with Spanish accents and emoji, iOS Safari, Android Chrome, translation and grammar extensions | 1.5 to 2 days |
 
-The work is split into tickets in [`issues/`](issues/): 01 to 29 and 33 for v1, and 30 to 32 for the deferred backlog.
+The work is split into tickets in [`issues/`](issues/): 01 to 29 and 33 for v1, and 30 to 32 and 34 for the deferred backlog.
 
 Estimates are rough guesses for one developer, about 13 to 18 days in total. M2 is the experiment: it is where the time is best spent, and it can be shown to a Client before M4 exists.
 
