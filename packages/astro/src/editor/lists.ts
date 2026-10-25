@@ -58,13 +58,16 @@ const dragAfter = 4;
 /** The page's Lists, as the Editor edits them. */
 export interface Lists {
   /**
-   * Shows `value` as the Items of the List at `path`, such as a List
-   * Change's `before` on Discard or a restored `after`. An Item that holds a
-   * built Item's value is that Item, as built, and the others are new, from
-   * the List's template. Does nothing for a path that is not a List the page
-   * shows.
+   * Shows `value` as the Items of the List at `path` in `root`, such as a
+   * List Change's built value on Discard or a restored `after`. An Item that
+   * holds a built Item's value is that Item, as built, and the others are
+   * new, from the List's template in `root`. Does nothing for a path that is
+   * not a List `root` shows.
+   *
+   * It records no Change. In a document other than the page, such as the
+   * phone preview's, the Items stay as a visitor sees them.
    */
-  show(path: string, value: ContentValue): void;
+  show(path: string, value: ContentValue, root?: ParentNode): void;
   /** What the List controls show, and what they do. */
   readonly controls: ListsUi;
 }
@@ -248,6 +251,22 @@ function editPage(
   const definitionOf = (list: HTMLElement): ListDefinition | undefined =>
     listAt(page.fields, list.dataset.edityList ?? '');
 
+  /**
+   * Whether `element` is the page's, rather than in a document the Editor
+   * only shows the Draft in, such as the phone preview's (ticket 15).
+   */
+  const onPage = (element: Element) => element.ownerDocument === document;
+
+  /** Documents whose Lists have a model, as they were built. */
+  const known = new WeakSet<Document>();
+  function registerAll(root: Document): void {
+    if (known.has(root)) return;
+    known.add(root);
+    for (const list of root.querySelectorAll<HTMLElement>(listSelector)) {
+      register(list, true);
+    }
+  }
+
   /** The Editor's own model of `list` and its Items. */
   function register(list: HTMLElement, built: boolean): void {
     const definition = definitionOf(list);
@@ -261,7 +280,7 @@ function editPage(
       built: built ? elements : [],
       values,
     });
-    resized.observe(list);
+    if (onPage(list)) resized.observe(list);
     elements.forEach((element, index) => {
       const origin = index < values.length ? index : undefined;
       items.set(element, {
@@ -271,16 +290,22 @@ function editPage(
           origin === undefined ? blankValue(definition.item) : values[index]!,
         ),
       });
-      resized.observe(element);
+      if (onPage(element)) resized.observe(element);
     });
   }
 
-  /** The List element at `path`, if the page shows it. */
-  function listAtPath(path: string): HTMLElement | undefined {
-    const list = document.querySelector<HTMLElement>(
+  /** The List element at `path`, if `root` shows it. */
+  function listAtPath(
+    path: string,
+    root: ParentNode = document,
+  ): HTMLElement | undefined {
+    const list = root.querySelector<HTMLElement>(
       `[data-edity-list="${CSS.escape(path)}"]`,
     );
-    return list !== null && lists.has(list) ? list : undefined;
+    if (list === null) return undefined;
+    // The phone preview's document is as built until the Draft shows there.
+    registerAll(list.ownerDocument);
+    return lists.has(list) ? list : undefined;
   }
 
   /** The innermost Item `target` is in, if it is the page's. */
@@ -354,10 +379,10 @@ function editPage(
     }
   }
 
-  fields.onInput(({ path, value, elements }) => {
+  fields.onInput(({ path, value, elements, shown }) => {
     // The phone preview's frame shows the Draft too (ticket 15): only the
     // page's Items are edited.
-    if (elements[0]?.ownerDocument !== document) return;
+    if (elements[0] === undefined || !onPage(elements[0])) return;
     const at = itemPathOf(path);
     const element =
       at &&
@@ -371,7 +396,8 @@ function editPage(
         ? value
         : { ...(model.value as Record<string, ContentValue>), [at.key]: value };
     if (quiet === 0) {
-      sync(path);
+      // A value shown from a Draft, or as built, is no edit of the Client's.
+      if (!shown) sync(path);
       relayout();
     }
   });
@@ -386,24 +412,20 @@ function editPage(
     relayout();
   }
 
-  /** A new Item for `list`, from its template, not on the page yet. */
+  /** A new Item for `list`, from its template, not in its document yet. */
   function newItem(list: HTMLElement): HTMLElement | undefined {
-    const template = list.querySelector<HTMLTemplateElement>(
-      ':scope > template[data-edity-template]',
-    );
-    if (template === null) return undefined;
-    const element = document.importNode(
-      template.content,
-      true,
-    ).firstElementChild;
-    if (!(element instanceof HTMLElement)) return undefined;
+    const template = templateOf(list);
+    if (template === undefined) return undefined;
+    const element = list.ownerDocument.importNode(template.content, true)
+      .firstElementChild as HTMLElement | null;
+    if (element === null) return undefined;
     const definition = definitionOf(list);
     items.set(element, {
       id: ++ids,
       origin: undefined,
       value: definition ? blankValue(definition.item) : '',
     });
-    resized.observe(element);
+    if (onPage(list)) resized.observe(element);
     for (const nested of element.querySelectorAll<HTMLElement>(listSelector)) {
       register(nested, false);
     }
@@ -412,7 +434,10 @@ function editPage(
 
   /** Puts `element` in `list` at `index`, and every path back in order. */
   function place(list: HTMLElement, element: HTMLElement, index: number): void {
-    list.insertBefore(element, itemsOf(list)[index] ?? templateOf(list));
+    list.insertBefore(
+      element,
+      itemsOf(list)[index] ?? templateOf(list) ?? null,
+    );
     renumber(list);
   }
 
@@ -423,15 +448,16 @@ function editPage(
     if (model === undefined || definition === undefined) return;
     model.value = structuredClone(value);
     const path = element.dataset.edityItem ?? '';
+    const root = element.ownerDocument;
     if (definition.item.kind === 'text') {
-      fields.show(path, value);
+      fields.show(path, value, root);
       return;
     }
     const values = value as Record<string, ContentValue>;
     for (const [key, each] of Object.entries(definition.item.shape)) {
       const shown = values[key] ?? blankValue(each);
       if (each.kind !== 'list') {
-        fields.show(`${path}.${key}`, shown);
+        fields.show(`${path}.${key}`, shown, root);
         continue;
       }
       const list = nestedList(element, key);
@@ -458,13 +484,14 @@ function editPage(
     }
     shown.forEach((element, index) => {
       if (element === undefined) return;
-      list.insertBefore(element, templateOf(list));
+      list.insertBefore(element, templateOf(list) ?? null);
       items.get(element)!.origin = origins[index];
     });
     renumber(list);
     for (const [index, element] of shown.entries()) {
       if (element === undefined) continue;
-      fields.connect(element);
+      // Elsewhere, such as in the phone preview, nothing is editable.
+      if (onPage(element)) fields.connect(element);
       fill(element, value[index]!);
     }
   }
@@ -609,11 +636,11 @@ function editPage(
     const index = itemsOf(list).indexOf(item);
     let added: HTMLElement | undefined;
     batch(() => {
-      fields.show(
-        element.dataset.edityField ?? '',
-        fieldValue(kind, text.slice(0, start)),
-      );
+      const path = element.dataset.edityField ?? '';
+      fields.show(path, fieldValue(kind, text.slice(0, start)));
       added = add(list, index + 1, fieldValue(kind, text.slice(end)));
+      // Adding records the List's Changes, the shorter Item's included.
+      if (added === undefined) sync(path);
     });
     if (added !== undefined) caretIn(firstField(added), 'start');
     return true;
@@ -990,9 +1017,7 @@ function editPage(
     };
   }
 
-  for (const list of document.querySelectorAll<HTMLElement>(listSelector)) {
-    register(list, true);
-  }
+  registerAll(document);
 
   // The visitor view (P7) leaves the Lists as a visitor sees them.
   effect(() => {
@@ -1002,12 +1027,15 @@ function editPage(
   });
 
   return {
-    show(path, value) {
-      const list = listAtPath(path);
+    show(path, value, root = document) {
+      const list = listAtPath(path, root);
       if (list === undefined || !Array.isArray(value)) return;
+      if (!onPage(list)) {
+        batch(() => showList(list, value));
+        return;
+      }
       dismissUndo();
       quietly(() => showList(list, value));
-      sync(path);
       relayout();
     },
     controls: {
@@ -1042,16 +1070,24 @@ function inEditor(event: Event): boolean {
   );
 }
 
+// The page's elements and the phone preview's come from two windows, each
+// with its own HTMLElement, so nothing below tells elements apart with
+// `instanceof`.
+
 /** A List element's Items, in order. */
 function itemsOf(list: HTMLElement): HTMLElement[] {
-  return [...list.children].filter(
-    (child): child is HTMLElement =>
-      child instanceof HTMLElement && child.hasAttribute('data-edity-item'),
-  );
+  return [...list.children].filter((child) =>
+    child.hasAttribute('data-edity-item'),
+  ) as HTMLElement[];
 }
 
-function templateOf(list: HTMLElement): Element | null {
-  return list.querySelector(':scope > template[data-edity-template]');
+/** The <template> a List's new Items come from (S3). */
+function templateOf(list: HTMLElement): HTMLTemplateElement | undefined {
+  return (
+    list.querySelector<HTMLTemplateElement>(
+      ':scope > template[data-edity-template]',
+    ) ?? undefined
+  );
 }
 
 /** Gives every Item of `list` the path of its place. */
@@ -1070,8 +1106,8 @@ function renumber(list: HTMLElement): void {
  */
 function rewrite(root: Element | DocumentFragment, from: string, to: string) {
   const elements =
-    root instanceof Element
-      ? [root, ...root.querySelectorAll('*')]
+    root.nodeType === Node.ELEMENT_NODE
+      ? [root as Element, ...root.querySelectorAll('*')]
       : [...root.querySelectorAll('*')];
   for (const element of elements) {
     for (const name of markers) {
@@ -1080,8 +1116,8 @@ function rewrite(root: Element | DocumentFragment, from: string, to: string) {
         element.setAttribute(name, to + value.slice(from.length));
       }
     }
-    if (element instanceof HTMLTemplateElement) {
-      rewrite(element.content, from, to);
+    if (element.localName === 'template') {
+      rewrite((element as HTMLTemplateElement).content, from, to);
     }
   }
 }

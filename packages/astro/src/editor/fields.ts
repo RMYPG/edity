@@ -34,6 +34,11 @@ export interface FieldInput {
   readonly value: ContentValue;
   /** Every element that shows it (E7), in document order. */
   readonly elements: readonly HTMLElement[];
+  /**
+   * Whether `show()` put the value there, such as a Draft's or the built
+   * one, rather than the Client: only the Client's own edits make Changes.
+   */
+  readonly shown: boolean;
 }
 
 /** The Site's Fields, as the Editor edits them. */
@@ -47,7 +52,8 @@ export interface Fields {
   /**
    * Shows `value` in every element of `root` that shows the Field at
    * `path`, formatting numbers as the template does. Does nothing for a
-   * path that is not a Field, such as a List's.
+   * path that is not a Field, such as a List's. It records no Change, and
+   * its input is `shown`.
    */
   show(path: string, value: ContentValue, root?: ParentNode): void;
   /**
@@ -150,8 +156,9 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     definition: FieldDefinition,
     value: ContentValue,
     elements: readonly HTMLElement[],
+    shown = false,
   ): void {
-    const input = { path, definition, value, elements };
+    const input = { path, definition, value, elements, shown };
     for (const listener of listeners) listener(input);
   }
 
@@ -483,7 +490,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
       for (const element of elements) {
         if (element.textContent !== text) element.textContent = text;
       }
-      if (elements.length > 0) notify(path, definition, value, elements);
+      if (elements.length > 0) notify(path, definition, value, elements, true);
     },
     onInput(listener) {
       listeners.add(listener);

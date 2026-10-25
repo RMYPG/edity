@@ -1,46 +1,86 @@
 // Showing a Draft in a document: the page itself, or the phone preview's
 // frame (P6). This is the one place that puts the Draft's values into a
-// document's elements, so restoring a Draft kept in the browser (ticket 14)
-// and the preview show it alike.
-import type { Change, ContentValue } from './draft.js';
+// document's elements, so restoring a Draft kept in the browser (P2),
+// Discard and the preview show it alike.
+import { batch } from '@preact/signals';
+import { valueAt } from './content.js';
+import type { Change, ContentValue, Draft } from './draft.js';
 import type { Fields } from './fields.js';
+import type { Lists } from './lists.js';
 
 /**
- * Shows each Change's `after` in `root`, in every element there that shows
- * its path, formatted as the template formats it. Returns the Changes `root`
- * has no element for, such as one to a Field the Site no longer has.
+ * Shows each Change's `after` in `root`, in order: a List Change as the
+ * List's Items, from its own template in `root` for new ones, and a Field
+ * Change in every element there that shows its path, formatted as the
+ * template formats it. Nothing becomes editable outside the page, and no
+ * Change is recorded. Returns the Changes `root` has no element for, such as
+ * one to a Field the Site no longer has.
  */
 export function showDraft(
   fields: Fields,
+  lists: Lists,
   changes: Iterable<Change>,
   root: ParentNode = document,
 ): Change[] {
   const missing: Change[] = [];
-  // TODO(ticket 14): show List Changes too, with ticket 13's code, before
-  // the Field Changes, which can be in their Items: build the List's Items
-  // in `root` from its own <template> (S3), the preview's included, and
-  // connect them only when `root` is the page. Today a List Change is
-  // reported missing.
-  for (const change of changes) {
-    const selector = `[data-edity-field="${CSS.escape(change.path)}"]`;
-    if (root.querySelector(selector) === null) missing.push(change);
-    else fields.show(change.path, change.after, root);
-  }
+  // In order: a Change `draftDelta` puts back as built can bring back the
+  // Item that a later Change is in.
+  batch(() => {
+    for (const change of changes) {
+      if (!shows(root, change)) {
+        missing.push(change);
+        continue;
+      }
+      // Each ignores the other's paths.
+      lists.show(change.path, change.after, root);
+      fields.show(change.path, change.after, root);
+    }
+  });
   return missing;
+}
+
+/** Whether `root` shows the List or the Field a Change is to. */
+function shows(root: ParentNode, { path, after }: Change): boolean {
+  const kind = Array.isArray(after)
+    ? 'list'
+    : typeof after === 'object'
+      ? undefined
+      : 'field';
+  return (
+    kind !== undefined &&
+    root.querySelector(`[data-edity-${kind}="${CSS.escape(path)}"]`) !== null
+  );
+}
+
+/**
+ * Shows a Draft restored from the browser on the page (P2), and drops the
+ * Changes to Fields and Lists it no longer has. Returns how many it dropped.
+ */
+export function restoreDraft(
+  draft: Draft,
+  fields: Fields,
+  lists: Lists,
+): number {
+  const missing = showDraft(fields, lists, draft.changes.peek().values());
+  batch(() => {
+    for (const { path } of missing) draft.remove(path);
+  });
+  return missing.length;
 }
 
 /**
  * The Changes that make a document showing the Draft `shown` show `next`:
- * first each Change `next` dropped, with its `before` as `after`, to put its
- * value back as built, then each Change new to `next` or with another value.
+ * first each Change `next` dropped, with its value in `content` (as built)
+ * as `after`, then each Change new to `next` or with another value.
  */
 export function draftDelta(
   shown: ReadonlyMap<string, Change>,
   next: ReadonlyMap<string, Change>,
+  content: unknown,
 ): Change[] {
   const delta: Change[] = [];
   for (const [path, change] of shown) {
-    if (!next.has(path)) delta.push({ ...change, after: change.before });
+    if (!next.has(path)) delta.push(asBuilt(change, content));
   }
   for (const [path, change] of next) {
     const before = shown.get(path);
@@ -49,6 +89,15 @@ export function draftDelta(
     }
   }
   return delta;
+}
+
+/**
+ * `change` with its value in `content` as `after`, to put it back as built.
+ * Its `before` can be older: the value it had when the Client first changed
+ * it, in an earlier Release.
+ */
+export function asBuilt(change: Change, content: unknown): Change {
+  return { ...change, after: valueAt(content, change.path) ?? change.before };
 }
 
 function sameValue(a: ContentValue, b: ContentValue): boolean {
