@@ -3,7 +3,9 @@
 // bodies stays in this module.
 //
 // TODO(ticket 18): make these calls through the client generated from
-// edity-server's OpenAPI file, keeping the functions' signatures.
+// edity-server's OpenAPI file, keeping the functions' signatures, and take
+// its request types in place of the ones here.
+import type { Change } from './draft.js';
 
 /** The signed-in Client, as `GET /_edity/api/session` returns them. */
 export interface Session {
@@ -46,6 +48,41 @@ export async function getSession(): Promise<SessionResult> {
     return { status: 'unavailable', reason: 'not a session' };
   }
   return { status: 'signed-in', session: body };
+}
+
+/**
+ * What `POST /_edity/api/publish` takes (P3): the page, and only the Draft's
+ * Changes, each with its value before and after.
+ */
+export interface PublishRequest {
+  /** The page's name: its content collection's. */
+  readonly page: string;
+  /** In the order the Client made them. */
+  readonly changes: readonly PublishedChange[];
+}
+
+/** One Change, as Publish sends it. */
+export interface PublishedChange {
+  /** A Field's or a List's content path, such as `hero.title` or `plans`. */
+  readonly path: string;
+  /** The value the Client changed, which the server checks for Conflicts (V2). */
+  readonly before: Change['before'];
+  readonly after: Change['after'];
+}
+
+/** What Publish sends for the Draft `changes` of `page`. */
+export function publishRequest(
+  page: string,
+  changes: Iterable<Change>,
+): PublishRequest {
+  return {
+    page,
+    changes: Array.from(changes, ({ path, before, after }) => ({
+      path,
+      before,
+      after,
+    })),
+  };
 }
 
 function isSession(body: unknown): body is Session {
