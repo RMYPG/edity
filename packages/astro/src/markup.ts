@@ -1,7 +1,9 @@
 // The editable markup: the attributes the template helpers (editable.ts) put
-// on a Site's elements for the Editor, and the few the Editor adds itself.
-// Their names are spelt here, for both. CSS files cannot import them, so
-// fields.css, limits.css and lists-page.css spell them too.
+// on a Site's elements for the Editor, and the few the Editor adds itself,
+// and the blank Item of a List's <template>. Their names are spelt here, for
+// both. CSS files cannot import them, so fields.css, limits.css and
+// lists-page.css spell them too.
+import type { Definition, NumberLimits } from '@edity/core';
 
 /** The markup's attribute names, by what they mark. */
 export const markup = {
@@ -57,4 +59,39 @@ export function markedPath(
 /** `value` as a CSS string in double quotes. */
 function quoted(value: string): string {
   return `"${value.replace(/["\\]/g, '\\$&').replace(/[\n\r\f]/g, (end) => `\\${end.charCodeAt(0).toString(16)} `)}"`;
+}
+
+/** What a blank Item holds: text, numbers, and Lists and objects of them. */
+export type Blank =
+  string | number | readonly Blank[] | { readonly [key: string]: Blank };
+
+/**
+ * The value of a blank Item, or of a value in it, for `definition`: empty
+ * text Fields, `number(limits)` in each number Field, and the fewest Items
+ * each List takes. A List's <template> renders one with every number Field
+ * at its minimum, a number the Site's template can format. The Editor holds
+ * `''` in them instead, which is no number yet, so that Publish waits until
+ * the Client types one.
+ */
+export function blankValue(
+  definition: Definition,
+  number: (limits: NumberLimits) => Blank,
+): Blank {
+  switch (definition.kind) {
+    case 'text':
+      return '';
+    case 'number':
+      return number(definition.limits);
+    case 'list':
+      return Array.from({ length: definition.limits.min }, () =>
+        blankValue(definition.item, number),
+      );
+    case 'object':
+      return Object.fromEntries(
+        Object.entries(definition.shape).map(([key, value]) => [
+          key,
+          blankValue(value, number),
+        ]),
+      );
+  }
 }

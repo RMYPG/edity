@@ -9,9 +9,9 @@ import {
 import { describe, expect, test } from 'vitest';
 import type { ContentValue } from './draft.js';
 import {
-  blankValue,
   listAt,
   listChanges,
+  newItemValue,
   originsOf,
   type ItemNow,
   type ListNow,
@@ -258,10 +258,10 @@ describe('originsOf', () => {
   });
 });
 
-describe('blankValue', () => {
-  test('is what a new Item holds: empty Fields and the fewest Items its Lists take', () => {
-    expect(blankValue(listAt(fields, 'services')!.item)).toBe('');
-    expect(blankValue(listAt(fields, 'plans')!.item)).toEqual({
+describe('newItemValue', () => {
+  test('is what a new Item holds: empty Fields, numbers too, and the fewest Items its Lists take', () => {
+    expect(newItemValue(listAt(fields, 'services')!.item)).toBe('');
+    expect(newItemValue(listAt(fields, 'plans')!.item)).toEqual({
       name: '',
       price: '',
       features: [''],

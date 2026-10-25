@@ -26,9 +26,9 @@ import type { ContentValue } from './draft.js';
 import { dropIndex, sameRow } from './drop.js';
 import type { Fields } from './fields.js';
 import {
-  blankValue,
   listAt,
   listChanges,
+  newItemValue,
   originsOf,
   type ItemNow,
   type ListNow,
@@ -279,7 +279,7 @@ function editPage(
         id: ++ids,
         origin,
         value: structuredClone(
-          origin === undefined ? blankValue(definition.item) : values[index]!,
+          origin === undefined ? newItemValue(definition.item) : values[index]!,
         ),
       });
       if (onPage(element)) resized.observe(element);
@@ -410,7 +410,7 @@ function editPage(
     items.set(element, {
       id: ++ids,
       origin: undefined,
-      value: definition ? blankValue(definition.item) : '',
+      value: definition ? newItemValue(definition.item) : '',
     });
     if (onPage(list)) resized.observe(element);
     for (const nested of element.querySelectorAll<HTMLElement>(listSelector)) {
@@ -442,7 +442,7 @@ function editPage(
     }
     const values = value as Record<string, ContentValue>;
     for (const [key, each] of Object.entries(definition.item.shape)) {
-      const shown = values[key] ?? blankValue(each);
+      const shown = values[key] ?? newItemValue(each);
       if (each.kind !== 'list') {
         fields.show(childPath(path, key), shown, root);
         continue;
@@ -500,7 +500,7 @@ function editPage(
     quietly(() => {
       place(list, element, index);
       fields.connect(element);
-      fill(element, value ?? blankValue(definition.item));
+      fill(element, value ?? newItemValue(definition.item));
     });
     edited(list);
     const elements = itemsOf(list);

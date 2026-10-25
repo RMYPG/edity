@@ -6,7 +6,7 @@ import {
   type ObjectDefinition,
 } from '@edity/core';
 import type * as z from 'zod/v4';
-import { markup } from './markup.js';
+import { blankValue, markup } from './markup.js';
 import { childPath, keysOf, pathOf } from './paths.js';
 
 /**
@@ -96,8 +96,8 @@ interface ItemBase<I> {
   readonly path: Marker;
   /**
    * The Item's content. In the List's `<template>` it is blank: text Fields
-   * are empty, number Fields are 0 or the Limit nearest to it, and Lists hold
-   * their minimum number of blank Items.
+   * are empty, number Fields hold their minimum, and Lists hold their
+   * minimum number of blank Items.
    */
   readonly value: I;
   /** The Item's position in its List. */
@@ -291,7 +291,7 @@ function list(
         page,
         path,
         definition,
-        blankValue(definition.item),
+        blankValue(definition.item, ({ min }) => min),
         values.length,
       );
       const blankHtml = rooted(page, await renderItem(blank), blank);
@@ -355,30 +355,6 @@ function rooted(page: Page, html: string, item: AnyItem): string {
     );
   }
   return html;
-}
-
-/** A blank Item: what a new Item holds until the Client fills it in. */
-function blankValue(definition: Definition): unknown {
-  switch (definition.kind) {
-    case 'text':
-      return '';
-    case 'number':
-      return Math.min(
-        Math.max(0, definition.limits.min),
-        definition.limits.max,
-      );
-    case 'list':
-      return Array.from({ length: definition.limits.min }, () =>
-        blankValue(definition.item),
-      );
-    case 'object':
-      return Object.fromEntries(
-        Object.entries(definition.shape).map(([key, value]) => [
-          key,
-          blankValue(value),
-        ]),
-      );
-  }
 }
 
 /** Escapes an attribute value the way Astro does. */

@@ -9,6 +9,7 @@ import type {
   TextDefinition,
 } from '@edity/core';
 import type { PageMarker } from '../editable.js';
+import { blankValue } from '../markup.js';
 import { childPath } from '../paths.js';
 import { definitionAt, fieldChange, sameValue, valueAt } from './content.js';
 import type { Change, ContentValue } from './draft.js';
@@ -113,25 +114,10 @@ export function originsOf(
 }
 
 /**
- * What a new Item holds until the Client fills it in: empty Fields, which a
- * number Field holds as text that is not a number yet, and the fewest Items
- * its List takes.
+ * What a new Item, or a value in it, holds until the Client fills it in: its
+ * List's blank Item (see `blankValue`), with every number Field empty. That
+ * is text and no number yet, so Publish waits until the Client types one.
  */
-export function blankValue(definition: Definition): ContentValue {
-  switch (definition.kind) {
-    case 'text':
-    case 'number':
-      return '';
-    case 'list':
-      return Array.from({ length: definition.limits.min }, () =>
-        blankValue(definition.item),
-      );
-    case 'object':
-      return Object.fromEntries(
-        Object.entries(definition.shape).map(([key, value]) => [
-          key,
-          blankValue(value),
-        ]),
-      );
-  }
+export function newItemValue(definition: Definition): ContentValue {
+  return blankValue(definition, () => '');
 }
