@@ -2,9 +2,15 @@
 # Listed before node: corepack's pnpm shim in node's bin would otherwise shadow this pinned version.
 "npm:pnpm" = "11.1.2"
 node = "24"
+# For the contracts/ Go module. The same version as edity-server.
+go = "1.27.2"
 jactionlint = "2.3.0"
 # jactionlint checks workflow scripts with it.
 shellcheck = "0.11.0"
+
+[env]
+# Use the Go pinned above, and fail rather than download another toolchain.
+GOTOOLCHAIN = "local"
 
 [tasks.deps]
 description = "Install npm dependencies from the lockfile"
@@ -18,19 +24,27 @@ sources = [
 outputs = { auto = true }
 
 [tasks.lint]
-description = "Lint the code with ESLint and the GitHub workflows with jactionlint"
+description = "Lint the code with ESLint and go vet, check that go.mod is tidy, and lint the GitHub workflows with jactionlint"
 depends = ["deps"]
-run = ["pnpm exec eslint .", "jactionlint"]
+run = [
+  "pnpm exec eslint .",
+  "go -C contracts vet ./...",
+  "go -C contracts mod tidy -diff",
+  "jactionlint",
+]
 
 [tasks.format]
-description = "Format every file with Prettier"
+description = "Format every file with Prettier, and the Go code with gofmt"
 depends = ["deps"]
-run = "pnpm exec prettier --write ."
+run = ["pnpm exec prettier --write .", "gofmt -w contracts"]
 
 [tasks."format:check"]
-description = "Check that every file is formatted with Prettier"
+description = "Check that every file is formatted with Prettier, and the Go code with gofmt"
 depends = ["deps"]
-run = "pnpm exec prettier --check ."
+run = [
+  "pnpm exec prettier --check .",
+  'unformatted=$(gofmt -l contracts); if [ -n "$unformatted" ]; then echo "Not formatted with gofmt: $unformatted"; exit 1; fi',
+]
 
 [tasks.typecheck]
 description = "Type-check every package and the root config files"
@@ -38,9 +52,9 @@ depends = ["deps"]
 run = ["pnpm exec tsc -p tsconfig.json", "pnpm -r typecheck"]
 
 [tasks.test]
-description = "Run every package's tests with Vitest"
+description = "Run every package's tests with Vitest, and the contracts module's with Go"
 depends = ["deps"]
-run = "pnpm exec vitest run"
+run = ["pnpm exec vitest run", "go -C contracts test ./..."]
 
 [tasks.build]
 description = "Build every package into its dist/"
@@ -60,6 +74,70 @@ for tarball in "$out"/*.tgz; do
   pnpm exec publint run "$tarball" --strict
   pnpm exec attw "$tarball" --profile esm-only --format table-flipped
 done
+'''
+
+[tasks."contracts:fetch"]
+description = "Fetch a contracts version with `go get` in a scratch module and load its files: a pushed tag, or with --local the committed HEAD tagged in a scratch clone"
+usage = '''
+arg "<version>" help="The version, without the contracts/ prefix of its tag, such as v0.1.0"
+flag "--local" help="Tag HEAD in a scratch clone and fetch from it instead of from GitHub through the Go proxy"
+'''
+shell = "bash -c"
+run = '''
+set -euo pipefail
+module=github.com/RMYPG/edity/contracts
+version=$usage_version
+work=$(mktemp -d)
+trap 'chmod -R u+w "$work"; rm -rf "$work"' EXIT
+# A scratch module cache, so a version fetched from a local tag never reaches
+# the real one.
+export GOMODCACHE="$work/mod" GOFLAGS=-modcacherw
+if [ "${usage_local:-false}" = true ]; then
+  git clone --quiet --no-checkout "$MISE_PROJECT_ROOT" "$work/edity"
+  git -C "$work/edity" tag -f "contracts/$version" "$(git -C "$MISE_PROJECT_ROOT" rev-parse HEAD)" > /dev/null
+  # go fetches the module from git, as the Go proxy does, but from the clone.
+  export GOPRIVATE=github.com/RMYPG/edity
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="url.$work/edity.insteadOf" GIT_CONFIG_VALUE_0=https://github.com/RMYPG/edity
+fi
+mkdir "$work/consumer"
+cd "$work/consumer"
+go mod init example.com/consumer 2> /dev/null
+go get "$module@$version"
+cat > main.go << 'EOF'
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/RMYPG/edity/contracts"
+)
+
+func main() {
+	fixtures, err := contracts.Fixtures()
+	if err != nil {
+		log.Fatal(err)
+	}
+	tests := 0
+	for _, fixture := range fixtures {
+		for _, c := range fixture.Cases {
+			tests += len(c.Tests)
+		}
+	}
+	metaSchemas := contracts.MetaSchemas()
+	if len(metaSchemas) != 2 || tests == 0 {
+		log.Fatalf("%d meta-schemas and %d tests", len(metaSchemas), tests)
+	}
+	fmt.Printf("%d meta-schemas, %d fixture files, %d tests\n", len(metaSchemas), len(fixtures), tests)
+}
+EOF
+go run .
+dir=$(go list -m -f '{% raw %}{{.Dir}}{% endraw %}' "$module")
+if [ ! -f "$dir/LICENSE" ]; then
+  echo "$module@$version has no LICENSE, so pkg.go.dev will not show its documentation"
+  exit 1
+fi
+go list -m "$module"
 '''
 
 [tasks.ci]
