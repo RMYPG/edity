@@ -1,0 +1,10 @@
+packages:
+  - packages/*
+
+strictDepBuilds: true
+
+minimumReleaseAge: 4320 # 3 days
+# minimumReleaseAgeExclude:
+#   - package-with-critical-hotfix@1.2.3
+
+trustPolicy: no-downgrade
