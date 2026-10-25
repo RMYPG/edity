@@ -37,6 +37,16 @@ describe('Draft', () => {
     ]);
   });
 
+  test('remove drops the Change at a path and keeps the order of the rest', () => {
+    const draft = new Draft([title, price]);
+
+    draft.remove('hero.title');
+    draft.remove('not.recorded');
+    draft.record(title);
+
+    expect([...draft.changes.value.values()]).toEqual([price, title]);
+  });
+
   test('discard drops every Change and returns them', () => {
     const draft = new Draft([title, price]);
 

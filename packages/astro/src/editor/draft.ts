@@ -47,6 +47,17 @@ export class Draft {
     this.#changes.value = new Map(this.#changes.value).set(change.path, change);
   }
 
+  /**
+   * Drops the Change at `path`, if there is one: the Field holds its built
+   * value again.
+   */
+  remove(path: string): void {
+    if (!this.#changes.value.has(path)) return;
+    const changes = new Map(this.#changes.value);
+    changes.delete(path);
+    this.#changes.value = changes;
+  }
+
   /** Drops every Change, and returns them so the page can be put back. */
   discard(): Change[] {
     const dropped = [...this.#changes.value.values()];

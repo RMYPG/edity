@@ -6,6 +6,7 @@ import {
 } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
 import type { Session } from './api.js';
+import { isWellFormed } from './content.js';
 import { Draft } from './draft.js';
 import {
   chooseLocale,
@@ -40,7 +41,10 @@ export interface EditorState {
    * including those it adds to the Site's own elements.
    */
   readonly view: Signal<View>;
-  /** Whether Publish is disabled: it is while the Draft is empty. */
+  /**
+   * Whether Publish is disabled: it is while the Draft is empty, or while a
+   * Change holds a value its Field cannot, such as a blank text.
+   */
   readonly publishDisabled: ReadonlySignal<boolean>;
 }
 
@@ -68,6 +72,13 @@ export function createEditorState({
     draft,
     view: signal('edit'),
     // TODO(ticket 12): also while a changed Field breaks a Limit.
-    publishDisabled: computed(() => draft.count.value === 0),
+    publishDisabled: computed(
+      () =>
+        draft.count.value === 0 ||
+        (page !== undefined &&
+          [...draft.changes.value.values()].some(
+            (change) => !isWellFormed(page.fields, change),
+          )),
+    ),
   };
 }
