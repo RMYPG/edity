@@ -1,6 +1,10 @@
 // What a Field's text on the page stands for, and back: the rules for plain
 // text (E3) and numbers (E5), apart from the DOM.
-import type { NumberDefinition, TextDefinition } from '@edity/core';
+import {
+  decimalPlaces,
+  type NumberDefinition,
+  type TextDefinition,
+} from '@edity/core';
 import type { ContentValue } from './draft.js';
 
 /** The definition of one Field: a text or a number. */
@@ -177,9 +181,10 @@ function digitsAfter(text: string, separator: string): number {
   return at === -1 ? 0 : (/^\d*/.exec(text.slice(at + 1))?.[0].length ?? 0);
 }
 
-/** How many decimals the shortest form of `value` has. */
+/**
+ * How many decimals the shortest form of `value` has, as its Limit counts
+ * them, up to the most `Intl.NumberFormat` shows.
+ */
 function fractionDigits(value: number): number {
-  const [mantissa = '', exponent = '0'] = String(value).split('e');
-  const digits = (mantissa.split('.')[1] ?? '').length - Number(exponent);
-  return Math.min(Math.max(digits, 0), 100);
+  return Math.min(decimalPlaces(value), 100);
 }

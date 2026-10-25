@@ -1,6 +1,11 @@
 // Reading a page's Field definitions and built content by path, and the
 // Changes a Field's value makes.
-import type { Definition, ObjectDefinition } from '@edity/core';
+import {
+  violations,
+  type Definition,
+  type ObjectDefinition,
+  type Violation,
+} from '@edity/core';
 import type { PageMarker } from '../editable.js';
 import type { Change, ContentValue } from './draft.js';
 import { fieldValue, type FieldDefinition } from './values.js';
@@ -97,44 +102,35 @@ export function fieldChange(
 }
 
 /**
+ * What makes a value one its Field or List cannot hold at all, apart from
+ * the Limits of its Fields: no text or no number, text that is not one
+ * visible line, or a List with too few or too many Items.
+ */
+const malformed: ReadonlySet<Violation['rule']> = new Set([
+  'type',
+  'unknown',
+  'oneLine',
+  'minItems',
+  'maxItems',
+]);
+
+/**
  * Whether a Change's `after` is a value its Field or List can hold at all:
- * text that is not blank, a number, or a List of `min` to `max` Items whose
- * Fields all are. Publish stays disabled until it is. The Fields' Limits are
- * checked apart.
+ * text that is one visible line, a number, or a List of `min` to `max` Items
+ * whose Fields all are. Publish stays disabled until it is. The Fields'
+ * Limits are checked apart: only Fields the Draft changed block Publish
+ * when over one (L7).
  */
 export function isWellFormed(
   fields: ObjectDefinition,
   change: Change,
 ): boolean {
   const definition = definitionAt(fields, change.path);
-  return definition === undefined || definition.kind === 'object'
-    ? true
-    : holds(definition, change.after);
-}
-
-function holds(
-  definition: Definition,
-  value: ContentValue | undefined,
-): boolean {
-  switch (definition.kind) {
-    case 'text':
-      return typeof value === 'string' && value.trim() !== '';
-    case 'number':
-      return typeof value === 'number' && Number.isFinite(value);
-    case 'list':
-      return (
-        Array.isArray(value) &&
-        value.length >= definition.limits.min &&
-        value.length <= definition.limits.max &&
-        value.every((item: ContentValue) => holds(definition.item, item))
-      );
-    case 'object':
-      return (
-        typeof value === 'object' &&
-        !Array.isArray(value) &&
-        Object.entries(definition.shape).every(([key, field]) =>
-          holds(field, (value as Record<string, ContentValue>)[key]),
-        )
-      );
-  }
+  return (
+    definition === undefined ||
+    definition.kind === 'object' ||
+    violations(definition, change.after).every(
+      (violation) => !malformed.has(violation.rule),
+    )
+  );
 }
