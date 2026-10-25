@@ -22,6 +22,13 @@ export interface Messages {
   readonly backToEditing: string;
   /** Shows the page at a phone's width, with the Draft (P6). */
   readonly phonePreview: string;
+  /**
+   * How many Changes of the Draft kept in the browser were dropped on
+   * restore, as the page no longer has their Field or List (P2).
+   */
+  notApplied(count: number): string;
+  /** Closes a notice. */
+  readonly dismiss: string;
   /** A Field's counter: one Limit its value is near or over (L3 to L5). */
   limit(count: Count): string;
   /** A counter on a Field that broke the Limit as published (L7). */
@@ -50,6 +57,11 @@ const messages: Readonly<Record<Locale, Messages>> = {
     visitorView: 'Vista de visitante',
     backToEditing: 'Volver a editar',
     phonePreview: 'Vista de móvil',
+    notApplied: (count) =>
+      count === 1
+        ? '1 cambio ya no se aplica'
+        : `${count} cambios ya no se aplican`,
+    dismiss: 'Entendido',
     limit(count) {
       switch (count.limit) {
         case 'chars':
@@ -89,6 +101,11 @@ const messages: Readonly<Record<Locale, Messages>> = {
     visitorView: 'Visitor view',
     backToEditing: 'Back to editing',
     phonePreview: 'Phone preview',
+    notApplied: (count) =>
+      count === 1
+        ? '1 change no longer applies'
+        : `${count} changes no longer apply`,
+    dismiss: 'OK',
     limit(count) {
       switch (count.limit) {
         case 'chars':

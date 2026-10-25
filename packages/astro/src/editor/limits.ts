@@ -1,7 +1,9 @@
 // A Field's value against its Limits (L1 to L5, L7), apart from the DOM:
 // what its counter shows, and whether it blocks Publish.
 import { graphemeCount, type NumberLimits, type TextLimits } from '@edity/core';
-import type { ContentValue } from './draft.js';
+import { valueAt } from './content.js';
+import type { Change, ContentValue } from './draft.js';
+import { originsOf } from './list-changes.js';
 import { numberValue, type FieldDefinition } from './values.js';
 
 /**
@@ -134,13 +136,26 @@ export function standing(counts: readonly Count[], changed: boolean): Standing {
 }
 
 /**
- * Whether the Field at `path` changed in a Draft holding Changes at
- * `changes`: one at its own path, or at a List it is in, whose structure
- * changed (S7).
+ * Whether the Field at `path` changed in a Draft holding `changes`, on a page
+ * built from `content`: it has a Change, or it is in a List whose structure
+ * changed (S7), in an Item that is not one of the List's built Items. A
+ * built Item that only moved shows what was published.
+ *
+ * Items are matched by value, as a List shown from a Draft gets its Items
+ * back (`originsOf`), so the phone preview tells the same as the page.
  */
-export function isChanged(path: string, changes: Iterable<string>): boolean {
-  for (const changed of changes) {
-    if (path === changed || path.startsWith(`${changed}.`)) return true;
+export function isChanged(
+  path: string,
+  changes: Iterable<Change>,
+  content: unknown,
+): boolean {
+  for (const change of changes) {
+    if (path === change.path) return true;
+    if (!path.startsWith(`${change.path}.`)) continue;
+    const built = valueAt(content, change.path);
+    if (!Array.isArray(change.after) || !Array.isArray(built)) return true;
+    const [index = ''] = path.slice(change.path.length + 1).split('.');
+    return originsOf(built, change.after)[Number(index)] === undefined;
   }
   return false;
 }

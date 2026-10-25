@@ -1,10 +1,11 @@
-import { batch, useSignal, type Signal } from '@preact/signals';
+import { useSignal, type Signal } from '@preact/signals';
 import { useEffect, useRef } from 'preact/hooks';
 import { Counters } from './Counters.js';
 import type { Fields } from './fields.js';
 import { ListControls } from './ListControls.js';
 import type { Lists } from './lists.js';
 import { Preview, PreviewToggle } from './Preview.js';
+import { asBuilt, showDraft } from './show-draft.js';
 import type { EditorState } from './state.js';
 import type { Limits } from './watch-limits.js';
 
@@ -54,10 +55,12 @@ export function Editor({ state, fields, lists, limits }: Props) {
             preview={preview}
           />
           <Counters limits={limits} t={state.t} />
+          <NotApplied state={state} />
           {preview.value && (
             <Preview
               state={state}
               fields={fields}
+              lists={lists}
               limits={limits}
               open={preview}
             />
@@ -79,7 +82,7 @@ interface BarProps extends ViewProps {
 }
 
 function Bar({ state, fields, lists, focus, preview }: BarProps) {
-  const { session, t, draft, view, publishDisabled } = state;
+  const { session, page, t, draft, view, publishDisabled } = state;
   const count = draft.count.value;
   const visitorView = useFocusOnMount(focus);
 
@@ -100,17 +103,17 @@ function Bar({ state, fields, lists, focus, preview }: BarProps) {
         disabled={count === 0}
         onClick={() => {
           const dropped = draft.discard();
-          // Lists first: until a List is back as built, the paths of its
-          // Fields may point at other Items. Each ignores the other's paths.
-          batch(() => {
-            for (const { path, before } of dropped) lists.show(path, before);
-            for (const { path, before } of dropped) fields.show(path, before);
-          });
+          // The page as built, which a Change's `before` may not be (V2).
+          showDraft(
+            fields,
+            lists,
+            dropped.map((change) => asBuilt(change, page?.content)),
+          );
         }}
       >
         {t.discard}
       </button>
-      {/* TODO(ticket 26): send the Draft. */}
+      {/* TODO(ticket 26): send the Draft, as `publishRequest` in api.ts. */}
       <button type="button" class="publish" disabled={publishDisabled.value}>
         {t.publish}
       </button>
@@ -126,6 +129,23 @@ function Bar({ state, fields, lists, focus, preview }: BarProps) {
           <span class="label">{t.visitorView}</span>
         </button>
       </span>
+    </div>
+  );
+}
+
+/**
+ * Tells the Client how many Changes of the Draft kept in the browser no
+ * longer apply (P2), above the bar, until they close it.
+ */
+function NotApplied({ state }: { readonly state: EditorState }) {
+  const { notApplied, t } = state;
+  if (notApplied.value === 0) return null;
+  return (
+    <div class="notice" role="status">
+      <span>{t.notApplied(notApplied.value)}</span>
+      <button type="button" onClick={() => (notApplied.value = 0)}>
+        {t.dismiss}
+      </button>
     </div>
   );
 }

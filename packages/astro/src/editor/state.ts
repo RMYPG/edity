@@ -7,7 +7,7 @@ import {
 import type { PageMarker } from '../editable.js';
 import type { Session } from './api.js';
 import { isWellFormed } from './content.js';
-import { Draft } from './draft.js';
+import { Draft, type Change } from './draft.js';
 import {
   chooseLocale,
   messagesFor,
@@ -37,6 +37,12 @@ export interface EditorState {
   /** The page's Draft. */
   readonly draft: Draft;
   /**
+   * How many Changes of the Draft kept in the browser were dropped when it
+   * was restored, because the page no longer has their Field or List (P2).
+   * The Client is told until they close the notice or change the Draft.
+   */
+  readonly notApplied: Signal<number>;
+  /**
    * How the Editor shows the page. In `visitor`, every Editor control hides,
    * including those it adds to the Site's own elements.
    */
@@ -59,6 +65,8 @@ export interface EditorStateOptions {
   readonly page: PageMarker | undefined;
   /** The browser's languages, in order of preference. */
   readonly languages: readonly string[];
+  /** The Changes the Draft starts with: the one kept in the browser (P2). */
+  readonly changes?: Iterable<Change>;
 }
 
 /** The state of an Editor that has just started on a page. */
@@ -66,10 +74,10 @@ export function createEditorState({
   session,
   page,
   languages,
+  changes,
 }: EditorStateOptions): EditorState {
   const locale = chooseLocale(session.locale, languages);
-  // TODO(ticket 14): start from the Draft kept in the browser.
-  const draft = new Draft();
+  const draft = new Draft(changes);
   const overLimit = signal(false);
   return {
     session,
@@ -77,6 +85,7 @@ export function createEditorState({
     locale,
     t: messagesFor(locale),
     draft,
+    notApplied: signal(0),
     view: signal('edit'),
     overLimit,
     publishDisabled: computed(

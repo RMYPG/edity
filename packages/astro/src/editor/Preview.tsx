@@ -12,6 +12,7 @@ import { editorRoot, readPage } from './documents.js';
 import type { Change } from './draft.js';
 import type { Fields } from './fields.js';
 import type { Messages } from './i18n.js';
+import type { Lists } from './lists.js';
 import { draftDelta, showDraft } from './show-draft.js';
 import type { EditorState } from './state.js';
 import type { Limits } from './watch-limits.js';
@@ -51,11 +52,12 @@ interface Props {
   readonly open: Signal<boolean>;
   readonly state: EditorState;
   readonly fields: Fields;
+  readonly lists: Lists;
   readonly limits: Limits;
 }
 
 /** The preview: the page as a phone shows it, with the Draft. */
-export function Preview({ state, fields, limits, open }: Props) {
+export function Preview({ state, fields, lists, limits, open }: Props) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   // A layout effect runs before the frame can load, so no event is missed.
   useLayoutEffect(() => {
@@ -65,7 +67,7 @@ export function Preview({ state, fields, limits, open }: Props) {
     };
     close();
     phone.addEventListener('change', close);
-    const stop = showIn(frame.current!, state, fields, limits);
+    const stop = showIn(frame.current!, state, fields, lists, limits);
     return () => {
       phone.removeEventListener('change', close);
       stop();
@@ -91,6 +93,7 @@ function showIn(
   frame: HTMLIFrameElement,
   state: EditorState,
   fields: Fields,
+  lists: Lists,
   limits: Limits,
 ): () => void {
   let shown: { readonly document: Document; stop(): void } | undefined;
@@ -105,7 +108,10 @@ function showIn(
       return;
     }
     shown?.stop();
-    shown = { document, stop: showPage(document, state, fields, limits) };
+    shown = {
+      document,
+      stop: showPage(document, state, fields, lists, limits),
+    };
   };
   frame.addEventListener(previewReady, loaded);
   frame.addEventListener('load', loaded);
@@ -126,6 +132,7 @@ function showPage(
   document: Document,
   { draft, page, locale, t }: EditorState,
   fields: Fields,
+  lists: Lists,
   limits: Limits,
 ): () => void {
   // A desktop's scroll bar would take some 15 px of the 390, and a phone's
@@ -144,7 +151,14 @@ function showPage(
   let showing: ReadonlyMap<string, Change> = new Map();
   const stopShowing = effect(() => {
     const changes = draft.changes.value;
-    untracked(() => showDraft(fields, draftDelta(showing, changes), document));
+    untracked(() =>
+      showDraft(
+        fields,
+        lists,
+        draftDelta(showing, changes, page.content),
+        document,
+      ),
+    );
     showing = changes;
   });
   const stopChecking = limits.watch(document);

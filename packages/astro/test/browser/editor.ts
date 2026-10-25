@@ -77,3 +77,39 @@ export function recordRequests(page: Page): string[] {
   page.on('request', (request) => paths.push(new URL(request.url()).pathname));
   return paths;
 }
+
+/** A Change, as the Editor keeps it in the browser and Publish sends it. */
+export interface KeptChange {
+  readonly path: string;
+  readonly before: unknown;
+  readonly after: unknown;
+}
+
+/** Where the Editor keeps the fixture page's Draft, for `ana`'s Site (P2). */
+const draftKey = 'edity:draft:v1:fixture:home';
+
+/**
+ * Keeps `changes` in the browser as the fixture page's Draft, as an earlier
+ * visit would have. Call it before `signIn`: it opens the page as a visitor
+ * sees it, so no Editor keeps its own Draft over it.
+ */
+export async function keepDraft(
+  page: Page,
+  changes: readonly KeptChange[],
+): Promise<void> {
+  await page.goto('/');
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [
+    draftKey,
+    JSON.stringify({ changes }),
+  ] as const);
+}
+
+/** The Changes of the Draft the browser keeps for the fixture page, if any. */
+export function keptDraft(page: Page): Promise<KeptChange[] | undefined> {
+  return page.evaluate((key) => {
+    const kept = localStorage.getItem(key);
+    return kept === null
+      ? undefined
+      : (JSON.parse(kept) as { changes: KeptChange[] }).changes;
+  }, draftKey);
+}

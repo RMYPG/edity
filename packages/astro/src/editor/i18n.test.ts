@@ -70,3 +70,12 @@ describe('Limit counters (L3 to L5)', () => {
     );
   });
 });
+
+describe('the restored Draft (P2)', () => {
+  test('says how many Changes no longer apply', () => {
+    expect(messagesFor('es').notApplied(1)).toBe('1 cambio ya no se aplica');
+    expect(messagesFor('es').notApplied(3)).toBe('3 cambios ya no se aplican');
+    expect(messagesFor('en').notApplied(1)).toBe('1 change no longer applies');
+    expect(messagesFor('en').notApplied(2)).toBe('2 changes no longer apply');
+  });
+});

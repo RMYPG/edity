@@ -1,12 +1,15 @@
 // The Editor bundle's entry point. The inline check imports it, from
 // /_edity/editor.<hash>.js, when the browser carries the edity=1 marker cookie.
+import { effect } from '@preact/signals';
 import { render } from 'preact';
 import { getSession } from './api.js';
 import { editorRoot, readPage } from './documents.js';
+import { draftStore, keepDraft, type DraftStore } from './draft-store.js';
 import { Editor } from './Editor.js';
 import { editFields, type Fields } from './fields.js';
 import { editLists, type Lists } from './lists.js';
 import { previewReady } from './Preview.js';
+import { restoreDraft } from './show-draft.js';
 import { createEditorState, type EditorState } from './state.js';
 import { watchLimits, type Limits } from './watch-limits.js';
 
@@ -29,18 +32,23 @@ async function start(): Promise<void> {
   const result = await session;
   switch (result.status) {
     case 'signed-in': {
+      const page = readPage(document);
+      // The Draft is kept per Site and page (P2).
+      const store =
+        page === undefined
+          ? undefined
+          : draftStore(result.session.site, page.page);
       const state = createEditorState({
         session: result.session,
-        page: readPage(document),
+        page,
         languages: navigator.languages,
+        changes: store?.load(),
       });
       const fields = editFields(state);
-      mount(
-        state,
-        fields,
-        editLists(state, fields),
-        watchLimits(state, fields),
-      );
+      const lists = editLists(state, fields);
+      const limits = watchLimits(state, fields);
+      if (store !== undefined) restore(state, fields, lists, store);
+      mount(state, fields, lists, limits);
       return;
     }
     case 'signed-out':
@@ -62,6 +70,26 @@ async function start(): Promise<void> {
 async function startPreview(): Promise<void> {
   await parsed();
   window.frameElement?.dispatchEvent(new Event(previewReady));
+}
+
+/**
+ * Shows the Draft kept in the browser on the page, tells the Client how many
+ * of its Changes no longer apply, and keeps the Draft there from now on.
+ */
+function restore(
+  { draft, notApplied }: EditorState,
+  fields: Fields,
+  lists: Lists,
+  store: DraftStore,
+): void {
+  notApplied.value = restoreDraft(draft, fields, lists);
+  keepDraft(draft, store);
+  // The notice is about the Draft as restored: it goes once the Client
+  // changes it.
+  const restored = draft.changes.peek();
+  effect(() => {
+    if (draft.changes.value !== restored) notApplied.value = 0;
+  });
 }
 
 /** Renders the Editor into one open shadow root, after the page's <body>. */

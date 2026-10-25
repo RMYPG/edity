@@ -104,4 +104,105 @@ describe('Draft', () => {
 
     expect(draft.changes.value).toBe(before);
   });
+
+  describe('a Change keeps the value before that the Client first changed (V2)', () => {
+    // Restored from the browser after a newer Release changed the content:
+    // the built value is not the one the Client changed any more.
+    const kept: Change = { ...title, before: 'Fisioterapia' };
+
+    test('recording its path again keeps it', () => {
+      const draft = new Draft([kept, price]);
+
+      draft.record({ ...title, after: 'Fisioterapia cerca de ti' });
+
+      expect([...draft.changes.value.values()]).toEqual([
+        { ...kept, after: 'Fisioterapia cerca de ti' },
+        price,
+      ]);
+    });
+
+    test('so does replacing a List’s Changes, for a path that stays', () => {
+      const draft = new Draft([
+        {
+          path: 'services',
+          before: ['Suelo pélvico'],
+          after: ['Suelo pélvico', 'Punción seca'],
+        },
+      ]);
+
+      draft.replace('services', [
+        {
+          path: 'services',
+          before: ['Suelo pélvico', 'Punción seca'],
+          after: ['Punción seca', 'Suelo pélvico', 'Masaje'],
+        },
+      ]);
+
+      expect([...draft.changes.value.values()]).toEqual([
+        {
+          path: 'services',
+          before: ['Suelo pélvico'],
+          after: ['Punción seca', 'Suelo pélvico', 'Masaje'],
+        },
+      ]);
+    });
+
+    test('a List Change keeps those of the Changes under it that it takes the place of (S7)', () => {
+      const draft = new Draft([
+        { path: 'plans.0.price', before: 19, after: 21 },
+        { path: 'plans.1.features', before: ['Una'], after: ['Una', 'Dos'] },
+      ]);
+      const built = [
+        { name: 'Básico', price: 19.99, features: ['Una sesión'] },
+        { name: 'Completo', price: 49.5, features: ['Cuatro', 'Plan'] },
+      ];
+
+      draft.replace('plans', [
+        { path: 'plans', before: built, after: [built[1]!] },
+      ]);
+
+      expect([...draft.changes.value.values()]).toEqual([
+        {
+          path: 'plans',
+          before: [
+            { name: 'Básico', price: 19, features: ['Una sesión'] },
+            { name: 'Completo', price: 49.5, features: ['Una'] },
+          ],
+          after: [built[1]],
+        },
+      ]);
+      // The built content it came from is left as it was.
+      expect(built[0]!.price).toBe(19.99);
+    });
+
+    test('Changes that take the place of a List Change keep what it held before at their paths', () => {
+      const draft = new Draft([
+        {
+          path: 'services',
+          before: ['Suelo', 'Punción seca'],
+          after: ['Punción seca', 'Suelo pélvico y embarazo'],
+        },
+      ]);
+
+      // Its Items back in their built order: a Change for each edited one.
+      draft.replace('services', [
+        {
+          path: 'services.0',
+          before: 'Suelo pélvico',
+          after: 'Suelo pélvico y embarazo',
+        },
+        { path: 'services.2', before: 'Masaje', after: 'Masajes' },
+      ]);
+
+      expect([...draft.changes.value.values()]).toEqual([
+        {
+          path: 'services.0',
+          before: 'Suelo',
+          after: 'Suelo pélvico y embarazo',
+        },
+        // An Item the List did not have when the Client first changed it.
+        { path: 'services.2', before: 'Masaje', after: 'Masajes' },
+      ]);
+    });
+  });
 });
