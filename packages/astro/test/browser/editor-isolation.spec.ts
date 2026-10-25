@@ -54,16 +54,23 @@ function editorStyles(page: Page) {
 }
 
 /**
- * What the Editor styles on purpose on the Site's Fields while editing: the
- * marks that show they are editable (E1).
+ * What the Editor styles on purpose on the Site's elements while editing,
+ * by selector: the marks that show Fields are editable (E1), and the cursor
+ * that shows Items can be dragged (S2), which their contents inherit.
  */
-const marks = ['outline-style', 'cursor'];
+const marks = {
+  '[data-edity-field]': ['outline-style', 'cursor'],
+  '[data-edity-item], [data-edity-item] *': ['cursor'],
+};
 
 /**
  * The computed `properties` of every element of the Site's page, but for
- * the `except` ones on Fields.
+ * the `except` ones on the elements their selectors match.
  */
-function siteStyles(page: Page, except: readonly string[] = []) {
+function siteStyles(
+  page: Page,
+  except: Readonly<Record<string, readonly string[]>> = {},
+) {
   return page.evaluate(
     ({ properties, except }) => {
       const elements = document.querySelectorAll(
@@ -71,11 +78,13 @@ function siteStyles(page: Page, except: readonly string[] = []) {
       );
       return [...elements].map((element) => {
         const style = getComputedStyle(element);
-        const field = element.matches('[data-edity-field]');
+        const skipped = Object.entries(except).flatMap(([selector, names]) =>
+          element.matches(selector) ? names : [],
+        );
         return [
           element.localName,
           ...properties.map((name) =>
-            field && except.includes(name) ? '' : style.getPropertyValue(name),
+            skipped.includes(name) ? '' : style.getPropertyValue(name),
           ),
         ];
       });
@@ -131,7 +140,7 @@ test("the Site's CSS does not reach the Editor", async ({
   expect(await editorStyles(page)).toEqual(before);
 });
 
-test("the Editor's CSS does not reach the Site, but for the marks on its Fields", async ({
+test("the Editor's CSS does not reach the Site, but for the marks on its Fields and Items", async ({
   page,
   openEditor,
 }) => {
