@@ -1,11 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
-
-/** Records the path of every request the page makes from now on. */
-function recordRequests(page: Page): string[] {
-  const paths: string[] = [];
-  page.on('request', (request) => paths.push(new URL(request.url()).pathname));
-  return paths;
-}
+import { expect, recordRequests, test } from './editor.js';
 
 test('without the edity=1 cookie, a page makes no request beyond itself (N1)', async ({
   page,
@@ -41,11 +34,11 @@ test('with the edity=1 cookie, the page loads the Editor bundle from its own ori
   page,
   context,
   baseURL,
+  signIn,
+  bar,
 }) => {
-  await context.addCookies([
-    { name: 'consent', value: 'yes', url: baseURL! },
-    { name: 'edity', value: '1', url: baseURL! },
-  ]);
+  await context.addCookies([{ name: 'consent', value: 'yes', url: baseURL! }]);
+  await signIn();
   const bundle = page.waitForResponse((response) =>
     /\/_edity\/editor\.[0-9a-f]{10}\.js$/.test(response.url()),
   );
@@ -55,8 +48,6 @@ test('with the edity=1 cookie, the page loads the Editor bundle from its own ori
   const response = await bundle;
   expect(new URL(response.url()).origin).toBe(new URL(baseURL!).origin);
   expect(response.status()).toBe(200);
-  // The bundle ran: the Editor rendered into its shadow root.
-  await expect(page.locator('edity-root [data-state="loaded"]')).toHaveText(
-    'Edity',
-  );
+  // The bundle ran: the Editor rendered its bar into its shadow root.
+  await expect(bar).toBeVisible();
 });
