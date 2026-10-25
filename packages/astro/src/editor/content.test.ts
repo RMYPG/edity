@@ -41,7 +41,12 @@ const content = {
   ],
 };
 
-const page = { page: 'home', fields, content };
+const page = {
+  page: 'home',
+  fields,
+  content,
+  narrowScreens: '(width < 600px)',
+};
 
 describe('fieldAt', () => {
   test('finds the definition of a Field anywhere, Items included', () => {

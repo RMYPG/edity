@@ -46,6 +46,10 @@ describe('the fixture Site built with Edity', () => {
     );
   });
 
+  test('says in the page marker which screens are narrow, by default those under 600 px (L2)', () => {
+    expect(html).toContain('narrowScreens&quot;:&quot;(width < 600px)&quot;');
+  });
+
   test('marks a value shown in two places with the same path in both', () => {
     const brand = html.match(
       /<[a-z]+ [^>]*data-edity-field="brand\.name"[^>]*>Fisio Sandbox</g,

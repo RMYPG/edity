@@ -1,0 +1,146 @@
+// A Field's value against its Limits (L1 to L5, L7), apart from the DOM:
+// what its counter shows, and whether it blocks Publish.
+import { graphemeCount, type NumberLimits, type TextLimits } from '@edity/core';
+import type { ContentValue } from './draft.js';
+import { numberValue, type FieldDefinition } from './values.js';
+
+/**
+ * One Limit a Field's value is near or over, as its counter shows it.
+ *
+ * - `chars`: visible characters, which are grapheme clusters, so an emoji or
+ *   an accented letter counts as one (L1).
+ * - `lines`: lines of text as the page renders it (L2).
+ * - `min`, `max`: a number below or above its range, `bound` (L5).
+ * - `decimals`: a number with more decimals than the Field's `max` (L5).
+ */
+export type Count =
+  | {
+      readonly limit: 'chars' | 'lines';
+      readonly count: number;
+      readonly max: number;
+    }
+  | { readonly limit: 'min' | 'max'; readonly bound: number }
+  | { readonly limit: 'decimals'; readonly max: number };
+
+/** Whether `count` is over its Limit, rather than near it. */
+export function isOver(count: Count): boolean {
+  return count.limit === 'chars' || count.limit === 'lines'
+    ? count.count > count.max
+    : true;
+}
+
+/** What a Field's text looks like on one element of the page. */
+export interface Rendered {
+  /** The lines its text takes there. */
+  readonly lines: number;
+  /** Whether that element's window is a narrow screen (L2). */
+  readonly narrow: boolean;
+}
+
+/**
+ * The Limits a Field's `value` is near or over, those it is over first: what
+ * its counter shows (L3, L4). Empty when the counter does not show.
+ *
+ * - Characters count from 80% of the Limit on.
+ * - Lines count only when there are too many: a one-line Field always has
+ *   all of its lines.
+ * - A number counts when it is out of range, or when the Field holds text
+ *   that is a number with too many decimals. Other text, such as nothing,
+ *   breaks no Limit: it is not a number at all.
+ */
+export function limitCounts(
+  definition: FieldDefinition,
+  value: ContentValue,
+  rendered?: Rendered,
+): Count[] {
+  const counts: Count[] =
+    definition.kind === 'text'
+      ? textCounts(definition.limits, String(value), rendered)
+      : numberCounts(definition.limits, value);
+  return [...counts.filter(isOver), ...counts.filter((each) => !isOver(each))];
+}
+
+function textCounts(
+  limits: TextLimits,
+  value: string,
+  rendered: Rendered | undefined,
+): Count[] {
+  const counts: Count[] = [];
+  const chars = graphemeCount(value);
+  if (chars * 5 >= limits.maxChars * 4) {
+    counts.push({ limit: 'chars', count: chars, max: limits.maxChars });
+  }
+  if (rendered !== undefined) {
+    const max = lineLimit(limits, rendered.narrow);
+    if (max !== undefined && rendered.lines > max) {
+      counts.push({ limit: 'lines', count: rendered.lines, max });
+    }
+  }
+  return counts;
+}
+
+function numberCounts(limits: NumberLimits, value: ContentValue): Count[] {
+  let number: number | undefined;
+  let decimals = false;
+  if (typeof value === 'number') {
+    number = value;
+    decimals = !hasAtMost(value, limits.decimals);
+  } else if (typeof value === 'string') {
+    number = numberValue(value, Infinity);
+    decimals = number !== undefined;
+  }
+  if (number === undefined) return [];
+  const counts: Count[] = [];
+  if (number < limits.min) counts.push({ limit: 'min', bound: limits.min });
+  if (number > limits.max) counts.push({ limit: 'max', bound: limits.max });
+  if (decimals) counts.push({ limit: 'decimals', max: limits.decimals });
+  return counts;
+}
+
+/**
+ * The most lines a text Field may take on a screen: its narrow value on a
+ * narrow one, if it has one (L2). `undefined` when it has no line Limit there.
+ */
+export function lineLimit(
+  limits: TextLimits,
+  narrow: boolean,
+): number | undefined {
+  return narrow ? (limits.maxLinesNarrow ?? limits.maxLines) : limits.maxLines;
+}
+
+/** Whether `value` has at most `decimals` digits after the point. */
+function hasAtMost(value: number, decimals: number): boolean {
+  // The shortest decimal form, as @edity/core checks it.
+  return Number(value.toFixed(Math.min(decimals, 100))) === value;
+}
+
+/**
+ * How a Field stands against its Limits on one element of the page.
+ *
+ * - `over`: it breaks a Limit and the Draft changed it, so it turns red and
+ *   Publish is disabled (L3).
+ * - `warning`: it breaks a Limit as published. Only Fields changed in the
+ *   Draft block Publish, so it only shows a warning (L7).
+ * - `near`: it is at 80% of a Limit, so its counter shows while it is being
+ *   edited (L4).
+ * - `within`: nothing to show.
+ */
+export type Standing = 'within' | 'near' | 'warning' | 'over';
+
+/** How a Field whose counter shows `counts` stands, given whether it changed. */
+export function standing(counts: readonly Count[], changed: boolean): Standing {
+  if (counts.some(isOver)) return changed ? 'over' : 'warning';
+  return counts.length > 0 ? 'near' : 'within';
+}
+
+/**
+ * Whether the Field at `path` changed in a Draft holding Changes at
+ * `changes`: one at its own path, or at a List it is in, whose structure
+ * changed (S7).
+ */
+export function isChanged(path: string, changes: Iterable<string>): boolean {
+  for (const changed of changes) {
+    if (path === changed || path.startsWith(`${changed}.`)) return true;
+  }
+  return false;
+}

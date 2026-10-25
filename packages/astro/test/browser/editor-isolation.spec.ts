@@ -1,6 +1,6 @@
 // N4: the Editor's controls live in a shadow root, isolated from the Site's
 // CSS in both directions.
-import type { Page } from '@playwright/test';
+import type { JSHandle, Page } from '@playwright/test';
 import { expect, test } from './editor.js';
 
 /** The computed properties compared, on the Editor's elements and the Site's. */
@@ -39,18 +39,29 @@ const properties = [
   'cursor',
 ];
 
-/** The computed `properties` of the Editor's host and of every element in its shadow root. */
-function editorStyles(page: Page) {
-  return page.locator('edity-root').evaluate((host, properties) => {
-    const elements = [host, ...host.shadowRoot!.querySelectorAll('*')];
-    return elements.map((element) => {
-      const style = getComputedStyle(element);
-      return [
-        element.localName,
-        ...properties.map((name) => style.getPropertyValue(name)),
-      ];
-    });
-  }, properties);
+/** The Editor's host and every element in its shadow root, as they are now. */
+function editorElements(page: Page) {
+  return page
+    .locator('edity-root')
+    .evaluateHandle((host) => [
+      host,
+      ...host.shadowRoot!.querySelectorAll('*'),
+    ]);
+}
+
+/** The computed `properties` of `elements`. */
+function editorStyles(elements: JSHandle<Element[]>) {
+  return elements.evaluate(
+    (elements, properties) =>
+      elements.map((element) => {
+        const style = getComputedStyle(element);
+        return [
+          element.localName,
+          ...properties.map((name) => style.getPropertyValue(name)),
+        ];
+      }),
+    properties,
+  );
 }
 
 /**
@@ -124,11 +135,18 @@ test("the Site's CSS does not reach the Editor", async ({
   openEditor,
 }) => {
   await openEditor();
-  const before = await editorStyles(page);
+  // A Limit counter shows too (L3).
+  await page.locator('[data-edity-field="contact.call"]').click();
+  await page.keyboard.type(' ya mismo, por favor');
+  await expect(page.locator('edity-root .counter')).toHaveCount(1);
+  // The same elements after, though the Site's CSS can make more counters
+  // show, for Fields it gives more lines.
+  const elements = await editorElements(page);
+  const before = await editorStyles(elements);
 
   await page.addStyleTag({ content: hostileCss });
 
-  expect(await editorStyles(page)).toEqual(before);
+  expect(await editorStyles(elements)).toEqual(before);
 });
 
 test("the Editor's CSS does not reach the Site, but for the marks on its Fields", async ({

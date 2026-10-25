@@ -1,5 +1,6 @@
 // The Editor's own text, in every language it speaks (N6). Its language
 // follows the Client's, never the Site's.
+import type { Count } from './limits.js';
 
 /** A language the Editor speaks. */
 export type Locale = 'es' | 'en';
@@ -18,7 +19,16 @@ export interface Messages {
   readonly visitorView: string;
   /** Leaves the visitor view. */
   readonly backToEditing: string;
+  /** A Field's counter: one Limit its value is near or over (L3 to L5). */
+  limit(count: Count): string;
+  /** A counter on a Field that broke the Limit as published (L7). */
+  published(limit: string): string;
 }
+
+const numbers = {
+  es: new Intl.NumberFormat('es'),
+  en: new Intl.NumberFormat('en'),
+};
 
 const messages: Readonly<Record<Locale, Messages>> = {
   es: {
@@ -34,6 +44,29 @@ const messages: Readonly<Record<Locale, Messages>> = {
     publish: 'Publicar',
     visitorView: 'Vista de visitante',
     backToEditing: 'Volver a editar',
+    limit(count) {
+      switch (count.limit) {
+        case 'chars':
+        case 'lines': {
+          const unit = count.limit === 'lines' ? ' líneas' : '';
+          const extra = count.count - count.max;
+          return `${count.count}/${count.max}${unit}${
+            extra <= 0 ? '' : extra === 1 ? ' · sobra 1' : ` · sobran ${extra}`
+          }`;
+        }
+        case 'min':
+          return `Mínimo ${numbers.es.format(count.bound)}`;
+        case 'max':
+          return `Máximo ${numbers.es.format(count.bound)}`;
+        case 'decimals':
+          return count.max === 0
+            ? 'Sin decimales'
+            : count.max === 1
+              ? 'Máximo 1 decimal'
+              : `Máximo ${count.max} decimales`;
+      }
+    },
+    published: (limit) => `${limit} · ya publicado así`,
   },
   en: {
     bar: 'Edity Editor',
@@ -48,6 +81,29 @@ const messages: Readonly<Record<Locale, Messages>> = {
     publish: 'Publish',
     visitorView: 'Visitor view',
     backToEditing: 'Back to editing',
+    limit(count) {
+      switch (count.limit) {
+        case 'chars':
+        case 'lines': {
+          const unit = count.limit === 'lines' ? ' lines' : '';
+          const extra = count.count - count.max;
+          return `${count.count}/${count.max}${unit}${
+            extra <= 0 ? '' : ` · ${extra} too many`
+          }`;
+        }
+        case 'min':
+          return `Minimum ${numbers.en.format(count.bound)}`;
+        case 'max':
+          return `Maximum ${numbers.en.format(count.bound)}`;
+        case 'decimals':
+          return count.max === 0
+            ? 'No decimals'
+            : count.max === 1
+              ? 'At most 1 decimal'
+              : `At most ${count.max} decimals`;
+      }
+    },
+    published: (limit) => `${limit} · already published`,
   },
 };
 

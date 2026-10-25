@@ -1,15 +1,19 @@
 import { useEffect, useRef } from 'preact/hooks';
+import { Counters } from './Counters.js';
 import type { Fields } from './fields.js';
 import type { EditorState } from './state.js';
+import type { Limits } from './watch-limits.js';
 
 interface Props {
   readonly state: EditorState;
   /** The Site's Fields, which Discard puts back as built. */
   readonly fields: Fields;
+  /** The Limits of the Site's Fields, whose counters show here. */
+  readonly limits: Limits;
 }
 
 /** The Editor's controls, rendered into its shadow root. */
-export function Editor({ state, fields }: Props) {
+export function Editor({ state, fields, limits }: Props) {
   // A view that appears after the first render came from the Client's
   // click, so it takes the focus the other view's button had.
   const started = useRef(false);
@@ -21,12 +25,18 @@ export function Editor({ state, fields }: Props) {
   return (
     <div class="edity" lang={state.locale}>
       {state.view.value === 'visitor' ? (
-        <BackToEditing state={state} fields={fields} focus={focus} />
+        <BackToEditing
+          state={state}
+          fields={fields}
+          limits={limits}
+          focus={focus}
+        />
       ) : (
         <>
           {/* Lets the end of the page scroll clear of the bar. */}
           <div class="spacer" />
-          <Bar state={state} fields={fields} focus={focus} />
+          <Bar state={state} fields={fields} limits={limits} focus={focus} />
+          <Counters limits={limits} t={state.t} />
         </>
       )}
     </div>

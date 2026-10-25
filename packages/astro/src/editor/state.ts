@@ -42,8 +42,14 @@ export interface EditorState {
    */
   readonly view: Signal<View>;
   /**
-   * Whether Publish is disabled: it is while the Draft is empty, or while a
-   * Change holds a value its Field cannot, such as a blank text.
+   * Whether a Field the Draft changed breaks one of its Limits (L3, L7).
+   * `watchLimits` keeps it.
+   */
+  readonly overLimit: Signal<boolean>;
+  /**
+   * Whether Publish is disabled: it is while the Draft is empty, while a
+   * Change holds a value its Field cannot, such as a blank text, or while a
+   * changed Field breaks a Limit.
    */
   readonly publishDisabled: ReadonlySignal<boolean>;
 }
@@ -64,6 +70,7 @@ export function createEditorState({
   const locale = chooseLocale(session.locale, languages);
   // TODO(ticket 14): start from the Draft kept in the browser.
   const draft = new Draft();
+  const overLimit = signal(false);
   return {
     session,
     page,
@@ -71,10 +78,11 @@ export function createEditorState({
     t: messagesFor(locale),
     draft,
     view: signal('edit'),
-    // TODO(ticket 12): also while a changed Field breaks a Limit.
+    overLimit,
     publishDisabled: computed(
       () =>
         draft.count.value === 0 ||
+        overLimit.value ||
         (page !== undefined &&
           [...draft.changes.value.values()].some(
             (change) => !isWellFormed(page.fields, change),
