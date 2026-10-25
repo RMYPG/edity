@@ -58,10 +58,49 @@ export class Draft {
     this.#changes.value = changes;
   }
 
+  /**
+   * Makes `changes` the Changes at `path` and under it (`path.…`), in place
+   * of those recorded there: a List's Changes, which are one for the whole
+   * List once its structure changes (S7), else those of its Fields. A path
+   * that stays keeps its position, and new ones go last.
+   */
+  replace(path: string, changes: Iterable<Change>): void {
+    const next = new Map([...changes].map((change) => [change.path, change]));
+    const kept = new Map<string, Change>();
+    let same = true;
+    for (const [at, change] of this.#changes.value) {
+      if (at !== path && !at.startsWith(`${path}.`)) {
+        kept.set(at, change);
+        continue;
+      }
+      const replacement = next.get(at);
+      next.delete(at);
+      if (replacement === undefined) {
+        same = false;
+        continue;
+      }
+      kept.set(at, replacement);
+      same &&= sameChange(change, replacement);
+    }
+    for (const [at, change] of next) {
+      kept.set(at, change);
+      same = false;
+    }
+    if (!same) this.#changes.value = kept;
+  }
+
   /** Drops every Change, and returns them so the page can be put back. */
   discard(): Change[] {
     const dropped = [...this.#changes.value.values()];
     this.#changes.value = new Map();
     return dropped;
   }
+}
+
+function sameChange(a: Change, b: Change): boolean {
+  return (
+    a.path === b.path &&
+    JSON.stringify(a.before) === JSON.stringify(b.before) &&
+    JSON.stringify(a.after) === JSON.stringify(b.after)
+  );
 }

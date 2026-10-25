@@ -55,4 +55,53 @@ describe('Draft', () => {
     expect(dropped).toEqual([title, price]);
     expect(draft.count.value).toBe(0);
   });
+
+  test("replace makes a List's Changes the ones at its path and under it (S7)", () => {
+    const name: Change = {
+      path: 'plans.0.name',
+      before: 'Básico',
+      after: 'Básico+',
+    };
+    const features: Change = {
+      path: 'plans.1.features',
+      before: ['Una'],
+      after: ['Una', 'Dos'],
+    };
+    const plans: Change = {
+      path: 'plans',
+      before: [{ name: 'Básico' }, { name: 'Completo' }],
+      after: [{ name: 'Completo' }, { name: 'Básico' }],
+    };
+    const lookalike: Change = { path: 'plansExtra', before: 'a', after: 'b' };
+    const draft = new Draft([name, title, lookalike]);
+
+    draft.replace('plans', [name, features]);
+    expect([...draft.changes.value.values()]).toEqual([
+      name,
+      title,
+      lookalike,
+      features,
+    ]);
+
+    draft.replace('plans', [plans]);
+    expect([...draft.changes.value.values()]).toEqual([
+      title,
+      lookalike,
+      plans,
+    ]);
+    expect(draft.count.value).toBe(3);
+
+    draft.replace('plans', []);
+    expect([...draft.changes.value.values()]).toEqual([title, lookalike]);
+  });
+
+  test('replace leaves the Changes as they were when they are the same', () => {
+    const draft = new Draft([title, price]);
+    const before = draft.changes.value;
+
+    draft.replace('hero', [{ ...title }]);
+    draft.replace('plans', []);
+
+    expect(draft.changes.value).toBe(before);
+  });
 });

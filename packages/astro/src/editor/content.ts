@@ -14,6 +14,20 @@ export function fieldAt(
   fields: ObjectDefinition,
   path: string,
 ): FieldDefinition | undefined {
+  const definition = definitionAt(fields, path);
+  return definition?.kind === 'text' || definition?.kind === 'number'
+    ? definition
+    : undefined;
+}
+
+/**
+ * The definition at `path`: a Field's, a List's, an Item's or a group's.
+ * Any index of a List stands for its Items.
+ */
+export function definitionAt(
+  fields: ObjectDefinition,
+  path: string,
+): Definition | undefined {
   let definition: Definition | undefined = fields;
   for (const key of path.split('.')) {
     if (definition?.kind === 'object') {
@@ -26,9 +40,7 @@ export function fieldAt(
       return undefined;
     }
   }
-  return definition?.kind === 'text' || definition?.kind === 'number'
-    ? definition
-    : undefined;
+  return definition;
 }
 
 /** The value at `path` in a page's content, if it has one. */
@@ -85,22 +97,44 @@ export function fieldChange(
 }
 
 /**
- * Whether a Change's `after` is a value its Field can hold at all: text
- * that is not blank, or a number. Publish stays disabled until it is. The
- * Field's Limits are checked apart.
+ * Whether a Change's `after` is a value its Field or List can hold at all:
+ * text that is not blank, a number, or a List of `min` to `max` Items whose
+ * Fields all are. Publish stays disabled until it is. The Fields' Limits are
+ * checked apart.
  */
 export function isWellFormed(
   fields: ObjectDefinition,
   change: Change,
 ): boolean {
-  const definition = fieldAt(fields, change.path);
-  switch (definition?.kind) {
+  const definition = definitionAt(fields, change.path);
+  return definition === undefined || definition.kind === 'object'
+    ? true
+    : holds(definition, change.after);
+}
+
+function holds(
+  definition: Definition,
+  value: ContentValue | undefined,
+): boolean {
+  switch (definition.kind) {
     case 'text':
-      return typeof change.after === 'string' && change.after.trim() !== '';
+      return typeof value === 'string' && value.trim() !== '';
     case 'number':
-      return typeof change.after === 'number' && Number.isFinite(change.after);
-    default:
-      // TODO(ticket 13): a List's Change.
-      return true;
+      return typeof value === 'number' && Number.isFinite(value);
+    case 'list':
+      return (
+        Array.isArray(value) &&
+        value.length >= definition.limits.min &&
+        value.length <= definition.limits.max &&
+        value.every((item: ContentValue) => holds(definition.item, item))
+      );
+    case 'object':
+      return (
+        typeof value === 'object' &&
+        !Array.isArray(value) &&
+        Object.entries(definition.shape).every(([key, field]) =>
+          holds(field, (value as Record<string, ContentValue>)[key]),
+        )
+      );
   }
 }
