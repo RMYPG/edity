@@ -8,6 +8,8 @@ dist/
 
 # test output
 coverage/
+playwright-report/
+test-results/
 
 # logs
 npm-debug.log*

@@ -57,6 +57,23 @@ description = "Run every package's tests with Vitest, and the contracts module's
 depends = ["build"]
 run = ["pnpm exec vitest run", "go -C contracts test ./..."]
 
+[tasks.browsers]
+description = "Install the browsers the browser tests run in, at the builds @edity/astro's Playwright expects"
+depends = ["deps"]
+usage = 'flag "--with-deps" help="Also install the system libraries they need, with sudo (for CI)"'
+shell = "bash -c"
+run = '''
+set -euo pipefail
+with_deps=()
+if [ "${usage_with_deps:-false}" = true ]; then with_deps=(--with-deps); fi
+pnpm --filter @edity/astro exec playwright install "${with_deps[@]}" chromium firefox webkit
+'''
+
+[tasks."test:browser"]
+description = "Run the browser tests with Playwright against the built fixture Site, in Chromium, Firefox, WebKit and an iPhone"
+depends = ["build", "browsers"]
+run = "pnpm --filter @edity/astro test:browser"
+
 [tasks.build]
 description = "Build every package into its dist/"
 depends = ["deps"]
@@ -146,4 +163,11 @@ go list -m "$module"
 
 [tasks.ci]
 description = "Run every check CI runs"
-depends = ["format:check", "lint", "typecheck", "test", "check:packages"]
+depends = [
+  "format:check",
+  "lint",
+  "typecheck",
+  "test",
+  "test:browser",
+  "check:packages",
+]

@@ -10,6 +10,8 @@ export default mergeConfig(
     },
     test: {
       name: '@edity/astro',
+      // Playwright runs these, against the built fixture Site.
+      exclude: ['test/browser/**'],
       // Tests in test/ build the fixture Site, which takes a few seconds.
       testTimeout: 60_000,
       hookTimeout: 120_000,
