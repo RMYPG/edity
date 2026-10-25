@@ -1,0 +1,7 @@
+dist/
+coverage/
+node_modules/
+.claude/
+pnpm-lock.yaml
+# The local issue tracker keeps its hand-written compact tables.
+.scratch/

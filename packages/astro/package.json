@@ -1,0 +1,38 @@
+{
+  "name": "@edity/astro",
+  "version": "0.1.0",
+  "description": "Astro integration and inline Editor for Edity.",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RMYPG/edity.git",
+    "directory": "packages/astro"
+  },
+  "homepage": "https://github.com/RMYPG/edity/tree/main/packages/astro#readme",
+  "bugs": "https://github.com/RMYPG/edity/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@edity/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@edity/core": "workspace:^"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
