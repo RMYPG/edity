@@ -171,6 +171,15 @@ export interface FieldDefinitions<S extends Shape = Shape> extends z.ZodObject<
   readonly [brand]: { readonly kind: 'fields' };
 }
 
+/**
+ * Any page's Field definitions, whatever Fields and Lists they hold: the type
+ * for a parameter that takes them. A bare `FieldDefinitions` describes no
+ * particular page, so a page's own Field definitions are not assignable to it.
+ */
+export type AnyFieldDefinitions = z.ZodType & {
+  readonly [brand]: { readonly kind: 'fields' };
+};
+
 // ---------------------------------------------------------------------------
 // Primitives
 
