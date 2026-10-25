@@ -16,12 +16,10 @@ import {
 } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
 import { markedPath, markup, selector } from '../markup.js';
-import { pathUnder } from '../paths.js';
-import { fieldAt, valueAt } from './content.js';
+import { fieldAt } from './content.js';
 import type { ContentValue } from './draft.js';
 import type { Fields } from './fields.js';
 import {
-  isChanged,
   limitCounts,
   lineLimit,
   standing,
@@ -239,7 +237,6 @@ function watchDocument(
     running.frame = undefined;
     const { window, resizes, observed } = running;
     const narrow = running.narrow.matches;
-    const changes = [...draft.changes.peek().values()];
     const focused = document.activeElement?.closest(field);
     const next: LimitMark[] = [];
     const seen = new Set<HTMLElement>();
@@ -266,7 +263,7 @@ function watchDocument(
           ? { lines: countLines(element), narrow }
           : undefined,
       );
-      const stands = standing(counts, isChanged(path, changes, page.content));
+      const stands = standing(counts, draft.isChanged(path, page.content));
       look(element, stands);
       seen.add(element);
       if (stands === 'within' || (stands === 'near' && element !== focused)) {
@@ -300,12 +297,7 @@ function watchDocument(
     }
     // A number Field's shows it as the template formats it, so its value is
     // the Draft's, or the built one.
-    for (const change of draft.changes.peek().values()) {
-      if (change.path === path) return change.after;
-      const under = pathUnder(path, change.path);
-      if (under !== undefined) return valueAt(change.after, under);
-    }
-    return valueAt(page.content, path);
+    return draft.valueAt(path, page.content);
   }
 
   /** Gives a Field element the look of its standing: red, warned or none. */

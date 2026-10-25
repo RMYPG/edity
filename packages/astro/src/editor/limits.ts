@@ -6,10 +6,7 @@ import {
   type NumberDefinition,
   type TextLimits,
 } from '@edity/core';
-import { isWithin, itemIndexIn } from '../paths.js';
-import { valueAt } from './content.js';
-import type { Change, ContentValue } from './draft.js';
-import { originsOf } from './list-changes.js';
+import type { ContentValue } from './draft.js';
 import { numberValue, type FieldDefinition } from './values.js';
 
 /**
@@ -144,35 +141,4 @@ export type Standing = 'within' | 'near' | 'warning' | 'over';
 export function standing(counts: readonly Count[], changed: boolean): Standing {
   if (counts.some(isOver)) return changed ? 'over' : 'warning';
   return counts.length > 0 ? 'near' : 'within';
-}
-
-/**
- * Whether the Field at `path` changed in a Draft holding `changes`, on a page
- * built from `content`: it has a Change, or it is in a List whose structure
- * changed (S7), in an Item that is not one of the List's built Items. A
- * built Item that only moved shows what was published.
- *
- * Items are matched by value, as a List shown from a Draft gets its Items
- * back (`originsOf`), so the phone preview tells the same as the page.
- */
-export function isChanged(
-  path: string,
-  changes: Iterable<Change>,
-  content: unknown,
-): boolean {
-  for (const change of changes) {
-    if (!isWithin(path, change.path)) continue;
-    if (path === change.path) return true;
-    const built = valueAt(content, change.path);
-    const index = itemIndexIn(path, change.path);
-    if (
-      !Array.isArray(change.after) ||
-      !Array.isArray(built) ||
-      index === undefined
-    ) {
-      return true;
-    }
-    return originsOf(built, change.after)[index] === undefined;
-  }
-  return false;
 }

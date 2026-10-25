@@ -1,6 +1,7 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
-import { isIndex, isWithin, keysOf, pathUnder } from '../paths.js';
+import { isIndex, isWithin, itemIndexIn, keysOf, pathUnder } from '../paths.js';
 import { sameValue, valueAt } from './content.js';
+import { originsOf } from './list-changes.js';
 
 /**
  * A value in a page's content: a Field's text or number, or a List's Items.
@@ -110,6 +111,47 @@ export class Draft {
       same = false;
     }
     if (!same) this.#changes.value = kept;
+  }
+
+  /**
+   * The value at `path` on a page built from `content`, with this Draft: the
+   * `after` of its Change at `path`, or the value at `path` in the `after`
+   * of the List Change it is in, else the built one.
+   */
+  valueAt(path: string, content: unknown): ContentValue | undefined {
+    for (const change of this.#changes.value.values()) {
+      if (change.path === path) return change.after;
+      const under = pathUnder(path, change.path);
+      if (under !== undefined) return valueAt(change.after, under);
+    }
+    return valueAt(content, path);
+  }
+
+  /**
+   * Whether this Draft changed the Field at `path`, on a page built from
+   * `content`: it has a Change, or it is in a List whose structure changed
+   * (S7), in an Item that is not one of the List's built Items. A built
+   * Item that only moved shows what was published (L7).
+   *
+   * Items are matched by value, as a List shown from a Draft gets its Items
+   * back (`originsOf`), so the phone preview tells the same as the page.
+   */
+  isChanged(path: string, content: unknown): boolean {
+    for (const change of this.#changes.value.values()) {
+      if (!isWithin(path, change.path)) continue;
+      if (path === change.path) return true;
+      const built = valueAt(content, change.path);
+      const index = itemIndexIn(path, change.path);
+      if (
+        !Array.isArray(change.after) ||
+        !Array.isArray(built) ||
+        index === undefined
+      ) {
+        return true;
+      }
+      return originsOf(built, change.after)[index] === undefined;
+    }
+    return false;
   }
 
   /** Drops every Change, and returns them so the page can be put back. */
