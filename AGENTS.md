@@ -4,6 +4,10 @@
 
 Every development tool is declared in `mise.toml` and run through mise (`mise install`, then `mise exec` or `mise run`). Add a tool to `mise.toml`, pinned, before using it.
 
+`mise run ci` runs every check CI runs.
+
+Inside the workspace, tsc and Vitest resolve `@edity/*` imports to each package's `src/` through the `@edity/source` export condition. Anything else (Node, an Astro build) reads `dist/`, so run `mise run build` first.
+
 ## Agent skills
 
 ### Issue tracker

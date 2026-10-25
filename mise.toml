@@ -2,3 +2,63 @@
 # Listed before node: corepack's pnpm shim in node's bin would otherwise shadow this pinned version.
 "npm:pnpm" = "11.1.2"
 node = "24"
+
+[tasks.deps]
+description = "Install npm dependencies from the lockfile"
+run = "pnpm install --frozen-lockfile"
+sources = [
+  "package.json",
+  "packages/*/package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+]
+outputs = { auto = true }
+
+[tasks.lint]
+description = "Lint the code with ESLint"
+depends = ["deps"]
+run = "pnpm exec eslint ."
+
+[tasks.format]
+description = "Format every file with Prettier"
+depends = ["deps"]
+run = "pnpm exec prettier --write ."
+
+[tasks."format:check"]
+description = "Check that every file is formatted with Prettier"
+depends = ["deps"]
+run = "pnpm exec prettier --check ."
+
+[tasks.typecheck]
+description = "Type-check every package and the root config files"
+depends = ["deps"]
+run = ["pnpm exec tsc -p tsconfig.json", "pnpm -r typecheck"]
+
+[tasks.test]
+description = "Run every package's tests with Vitest"
+depends = ["deps"]
+run = "pnpm exec vitest run"
+
+[tasks.build]
+description = "Build every package into its dist/"
+depends = ["deps"]
+run = "pnpm -r build"
+
+[tasks."check:packages"]
+description = "Pack every package and check it is publishable, with types that resolve"
+depends = ["build"]
+shell = "bash -c"
+run = '''
+set -euo pipefail
+out=$(mktemp -d)
+trap 'rm -rf "$out"' EXIT
+pnpm -r pack --pack-destination "$out" > /dev/null
+for tarball in "$out"/*.tgz; do
+  pnpm exec publint run "$tarball" --strict
+  pnpm exec attw "$tarball" --profile esm-only --format table-flipped
+done
+'''
+
+[tasks.ci]
+description = "Run every check CI runs"
+depends = ["format:check", "lint", "typecheck", "test", "check:packages"]
