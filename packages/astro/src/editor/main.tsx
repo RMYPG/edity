@@ -5,6 +5,7 @@ import type { PageMarker } from '../editable.js';
 import { getSession } from './api.js';
 import { Editor } from './Editor.js';
 import css from './editor.css?inline';
+import { editFields, type Fields } from './fields.js';
 import { createEditorState, type EditorState } from './state.js';
 
 // Only the top window runs the Editor. A same-origin frame, such as ticket
@@ -24,16 +25,15 @@ async function start(): Promise<void> {
   await parsed();
   const result = await session;
   switch (result.status) {
-    case 'signed-in':
-      mount(
-        createEditorState({
-          session: result.session,
-          page: readPage(),
-          languages: navigator.languages,
-        }),
-      );
-      // TODO(ticket 11): make the page's Fields editable.
+    case 'signed-in': {
+      const state = createEditorState({
+        session: result.session,
+        page: readPage(),
+        languages: navigator.languages,
+      });
+      mount(state, editFields(state));
       return;
+    }
     case 'signed-out':
       // Visitors from now on, until the Client logs in again.
       document.cookie = 'edity=; Path=/; Max-Age=0; SameSite=Lax';
@@ -46,7 +46,7 @@ async function start(): Promise<void> {
 }
 
 /** Renders the Editor into one open shadow root, after the page's <body>. */
-function mount(state: EditorState): void {
+function mount(state: EditorState, fields: Fields): void {
   // One unknown tag, which no Site CSS selects by name. The root is open so
   // browser tests can reach inside.
   const host = document.createElement('edity-root');
@@ -58,7 +58,7 @@ function mount(state: EditorState): void {
   // Not in <body>, where it would change what the Site's :last-child and
   // flex or grid rules apply to.
   document.documentElement.append(host);
-  render(<Editor state={state} />, shadow);
+  render(<Editor state={state} fields={fields} />, shadow);
 }
 
 /** Resolves once the browser has parsed the page: import() can come first. */

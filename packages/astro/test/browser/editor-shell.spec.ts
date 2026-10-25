@@ -107,6 +107,9 @@ test('the visitor view hides every Editor control, and the bar comes back (P7)',
   await expect
     .poll(() => page.evaluate(() => document.documentElement.scrollHeight))
     .toBe(visitorsHeight);
+  // No Field is editable or marked.
+  await expect(page.locator('[contenteditable]')).toHaveCount(0);
+  expect(await page.evaluate(() => document.adoptedStyleSheets.length)).toBe(0);
 
   await editor.getByRole('button', { name: 'Volver a editar' }).click();
 
@@ -114,4 +117,27 @@ test('the visitor view hides every Editor control, and the bar comes back (P7)',
   await expect(
     bar.getByRole('button', { name: 'Vista de visitante' }),
   ).toBeFocused();
+  await expect(page.locator('[contenteditable]')).toHaveCount(
+    await page.locator('[data-edity-field]').count(),
+  );
+});
+
+test('in the visitor view, Fields are not edited and links work again (P7)', async ({
+  page,
+  openEditor,
+  editor,
+  bar,
+}) => {
+  await openEditor();
+  const title = page.locator('[data-edity-field="hero.title"]');
+  const text = await title.textContent();
+  await bar.getByRole('button', { name: 'Vista de visitante' }).click();
+  await expect(editor.getByRole('button')).toHaveText(['Volver a editar']);
+
+  await title.click();
+  await page.keyboard.type('x');
+  await expect(title).toHaveText(text!);
+
+  await page.locator('[data-edity-field="hero.cta"]').click();
+  await expect(page).toHaveURL(/#contacto$/);
 });

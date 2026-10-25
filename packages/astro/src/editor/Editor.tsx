@@ -1,12 +1,15 @@
 import { useEffect, useRef } from 'preact/hooks';
+import type { Fields } from './fields.js';
 import type { EditorState } from './state.js';
 
 interface Props {
   readonly state: EditorState;
+  /** The Site's Fields, which Discard puts back as built. */
+  readonly fields: Fields;
 }
 
 /** The Editor's controls, rendered into its shadow root. */
-export function Editor({ state }: Props) {
+export function Editor({ state, fields }: Props) {
   // A view that appears after the first render came from the Client's
   // click, so it takes the focus the other view's button had.
   const started = useRef(false);
@@ -18,12 +21,12 @@ export function Editor({ state }: Props) {
   return (
     <div class="edity" lang={state.locale}>
       {state.view.value === 'visitor' ? (
-        <BackToEditing state={state} focus={focus} />
+        <BackToEditing state={state} fields={fields} focus={focus} />
       ) : (
         <>
           {/* Lets the end of the page scroll clear of the bar. */}
           <div class="spacer" />
-          <Bar state={state} focus={focus} />
+          <Bar state={state} fields={fields} focus={focus} />
         </>
       )}
     </div>
@@ -35,7 +38,7 @@ interface ViewProps extends Props {
   readonly focus: boolean;
 }
 
-function Bar({ state, focus }: ViewProps) {
+function Bar({ state, fields, focus }: ViewProps) {
   const { session, t, draft, view, publishDisabled } = state;
   const count = draft.count.value;
   const visitorView = useFocusOnMount(focus);
@@ -51,12 +54,16 @@ function Bar({ state, focus }: ViewProps) {
       <span class="count" role="status">
         {t.changes(count)}
       </span>
-      {/* TODO(ticket 11): put each Field the Draft held back on the page. */}
       <button
         type="button"
         class="discard"
         disabled={count === 0}
-        onClick={() => draft.discard()}
+        onClick={() => {
+          // TODO(ticket 13): put back the Lists whose structure changed.
+          for (const { path, before } of draft.discard()) {
+            fields.show(path, before);
+          }
+        }}
       >
         {t.discard}
       </button>

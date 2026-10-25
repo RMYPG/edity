@@ -53,18 +53,35 @@ function editorStyles(page: Page) {
   }, properties);
 }
 
-/** The computed `properties` of every element of the Site's page. */
-function siteStyles(page: Page) {
-  return page.evaluate((properties) => {
-    const elements = document.querySelectorAll('html, html *:not(edity-root)');
-    return [...elements].map((element) => {
-      const style = getComputedStyle(element);
-      return [
-        element.localName,
-        ...properties.map((name) => style.getPropertyValue(name)),
-      ];
-    });
-  }, properties);
+/**
+ * What the Editor styles on purpose on the Site's Fields while editing: the
+ * marks that show they are editable (E1).
+ */
+const marks = ['outline-style', 'cursor'];
+
+/**
+ * The computed `properties` of every element of the Site's page, but for
+ * the `except` ones on Fields.
+ */
+function siteStyles(page: Page, except: readonly string[] = []) {
+  return page.evaluate(
+    ({ properties, except }) => {
+      const elements = document.querySelectorAll(
+        'html, html *:not(edity-root)',
+      );
+      return [...elements].map((element) => {
+        const style = getComputedStyle(element);
+        const field = element.matches('[data-edity-field]');
+        return [
+          element.localName,
+          ...properties.map((name) =>
+            field && except.includes(name) ? '' : style.getPropertyValue(name),
+          ),
+        ];
+      });
+    },
+    { properties, except },
+  );
 }
 
 /**
@@ -114,14 +131,29 @@ test("the Site's CSS does not reach the Editor", async ({
   expect(await editorStyles(page)).toEqual(before);
 });
 
-test("the Editor's CSS does not reach the Site", async ({
+test("the Editor's CSS does not reach the Site, but for the marks on its Fields", async ({
   page,
   openEditor,
 }) => {
   await page.goto('/');
-  const visitorsStyles = await siteStyles(page);
+  const visitorsStyles = await siteStyles(page, marks);
 
   await openEditor();
+
+  expect(await siteStyles(page, marks)).toEqual(visitorsStyles);
+});
+
+test('in the visitor view, the Site looks exactly as a visitor sees it (P7)', async ({
+  page,
+  openEditor,
+  bar,
+}) => {
+  await page.goto('/');
+  const visitorsStyles = await siteStyles(page);
+  await openEditor();
+
+  await bar.getByRole('button', { name: 'Vista de visitante' }).click();
+  await expect(bar).toHaveCount(0);
 
   expect(await siteStyles(page)).toEqual(visitorsStyles);
 });
