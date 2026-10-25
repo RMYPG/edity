@@ -34,6 +34,7 @@
     "zod": "^4.6.0"
   },
   "devDependencies": {
+    "ajv": "^8.20.0",
     "prettier": "^3.9.10",
     "zod": "^4.6.7"
   },
