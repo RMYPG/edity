@@ -155,10 +155,9 @@ export const fromSource: Plugin = {
 };
 
 /**
- * Removes what Edity adds to a built page: `data-edity-*` attributes and the
- * `<template>` of every List.
+ * Removes what Edity adds to a built page: `data-edity-*` attributes, the
+ * `<template>` of every List and the inline check that loads the Editor.
  */
-// TODO(ticket 09): also remove the inline check.
 export function withoutEdity(html: string): string {
   let rest = html;
   let out = '';
@@ -170,8 +169,14 @@ export function withoutEdity(html: string): string {
     out += rest.slice(0, start);
     rest = rest.slice(endOfTemplate(rest, start));
   }
-  return (out + rest).replace(/ data-edity-[a-z-]+="[^"]*"/g, '');
+  return (out + rest)
+    .replace(/ data-edity-[a-z-]+="[^"]*"/g, '')
+    .replace(inlineCheck, '');
 }
+
+/** The inline check, exactly as the integration writes it. */
+const inlineCheck =
+  /<script>\/\(\^\|; \)edity=1\(;\|\$\)\/\.test\(document\.cookie\)&&import\("\/_edity\/editor\.[0-9a-f]{10}\.js"\)<\/script>/;
 
 /** The index just after the `</template>` that closes the one at `start`. */
 function endOfTemplate(html: string, start: number): number {

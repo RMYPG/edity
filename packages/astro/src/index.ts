@@ -1,5 +1,6 @@
 import type { AstroIntegration } from 'astro';
 import type { HelperOptions } from './editable.js';
+import { editorBundle } from './editor-bundle.js';
 
 export type {
   EditablePage,
@@ -19,7 +20,8 @@ export interface EdityOptions {
   /**
    * `false` builds the Site as it would be without Edity: the template
    * helpers mark nothing, so there are no `data-edity-*` attributes and no
-   * `<template>`. Defaults to `true`.
+   * `<template>`, and there is no inline check or Editor bundle. Defaults to
+   * `true`.
    */
   readonly enabled?: boolean;
 }
@@ -39,6 +41,7 @@ export default function edity(options: EdityOptions = {}): AstroIntegration {
           vite: {
             define: { __EDITY_OPTIONS__: JSON.stringify(helpers) },
           },
+          integrations: helpers.enabled ? [editorBundle()] : [],
         });
       },
     },

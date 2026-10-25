@@ -17,7 +17,7 @@ describe('the fixture Site built with Edity', () => {
     await disabled?.remove();
   });
 
-  test('differs from the Site without Edity only by data- attributes and one template per List', async () => {
+  test('differs from the Site without Edity only by data- attributes, the inline check and one template per List (N2)', async () => {
     const without = await disabled.read('index.html');
 
     expect(without).not.toContain('data-edity');

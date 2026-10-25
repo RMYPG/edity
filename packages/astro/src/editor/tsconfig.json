@@ -1,0 +1,16 @@
+{
+  // The Editor runs in the browser, and Vite bundles it into dist/editor.js
+  // (vite.editor.config.ts), so it type-checks apart from the integration.
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    // Types `import css from './x.css?inline'` and the other Vite imports.
+    "types": ["vite/client"],
+    "noEmit": true
+  },
+  "include": ["."]
+}
