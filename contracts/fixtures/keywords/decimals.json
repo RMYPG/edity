@@ -1,0 +1,128 @@
+[
+  {
+    "description": "x-edity-decimals allows at most N fraction digits in the shortest decimal form of the value",
+    "comment": "The value is read as an IEEE 754 double and written in its shortest round-trip decimal form, without an exponent, as JavaScript's String() and Go's strconv.FormatFloat(f, 'f', -1, 64) do.",
+    "schema": {
+      "$schema": "https://github.com/RMYPG/edity/contracts/v1/schema",
+      "type": "number",
+      "x-edity-decimals": 2
+    },
+    "tests": [
+      {
+        "description": "two decimals",
+        "comment": "19.99 / 0.01 is not a whole number in floating point, so a float multipleOf would reject it.",
+        "data": 19.99,
+        "valid": true
+      },
+      {
+        "description": "one decimal",
+        "comment": "1.1 * 100 is 110.00000000000001 in floating point.",
+        "data": 1.1,
+        "valid": true
+      },
+      {
+        "description": "two decimals after a zero",
+        "comment": "0.07 * 100 is 7.000000000000001 in floating point.",
+        "data": 0.07,
+        "valid": true
+      },
+      { "description": "a whole number", "data": 7, "valid": true },
+      { "description": "zero", "data": 0, "valid": true },
+      {
+        "description": "a negative number with two decimals",
+        "data": -0.05,
+        "valid": true
+      },
+      {
+        "description": "many digits before the point",
+        "data": 123456789.12,
+        "valid": true
+      },
+      { "description": "three decimals", "data": 1.005, "valid": false },
+      {
+        "description": "a negative number with three decimals",
+        "data": -0.125,
+        "valid": false
+      },
+      {
+        "description": "0.1 + 0.2 has 17 decimals",
+        "data": 0.30000000000000004,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "x-edity-decimals counts the value, not how the JSON text writes it",
+    "schema": {
+      "$schema": "https://github.com/RMYPG/edity/contracts/v1/schema",
+      "type": "number",
+      "x-edity-decimals": 2
+    },
+    "tests": [
+      { "description": "a zero fraction", "data": 1.0, "valid": true },
+      {
+        "description": "a whole number in exponent form",
+        "data": 1e2,
+        "valid": true
+      },
+      {
+        "description": "two decimals in exponent form",
+        "data": 2.5e-1,
+        "valid": true
+      },
+      {
+        "description": "seven decimals in exponent form",
+        "data": 1e-7,
+        "valid": false
+      },
+      {
+        "description": "three decimals in exponent form",
+        "data": 1.5e-2,
+        "valid": false
+      },
+      {
+        "description": "a number JavaScript prints in exponent form",
+        "data": 1e21,
+        "valid": true
+      }
+    ]
+  },
+  {
+    "description": "x-edity-decimals 0 allows whole numbers only",
+    "comment": "Generated schemas write no decimals as \"type\": \"integer\" instead.",
+    "schema": {
+      "$schema": "https://github.com/RMYPG/edity/contracts/v1/schema",
+      "type": "number",
+      "x-edity-decimals": 0
+    },
+    "tests": [
+      { "description": "a whole number", "data": 3, "valid": true },
+      { "description": "a negative whole number", "data": -3, "valid": true },
+      { "description": "a zero fraction", "data": 3.0, "valid": true },
+      { "description": "one decimal", "data": 3.5, "valid": false },
+      {
+        "description": "seven decimals in exponent form",
+        "data": 1e-7,
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "x-edity-decimals applies to numbers only",
+    "schema": {
+      "$schema": "https://github.com/RMYPG/edity/contracts/v1/schema",
+      "x-edity-decimals": 1
+    },
+    "tests": [
+      { "description": "a string of digits", "data": "1.005", "valid": true },
+      { "description": "a list of numbers", "data": [1.005], "valid": true },
+      { "description": "an object", "data": { "a": 1.005 }, "valid": true },
+      { "description": "null", "data": null, "valid": true },
+      {
+        "description": "a number over the maximum",
+        "data": 1.05,
+        "valid": false
+      }
+    ]
+  }
+]

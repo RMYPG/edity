@@ -1,0 +1,24 @@
+[
+  {
+    "description": "x-edity-maxLines and x-edity-maxLinesNarrow are annotations: validators accept any instance",
+    "comment": "The Editor measures rendered lines in the browser.",
+    "schema": {
+      "$schema": "https://github.com/RMYPG/edity/contracts/v1/schema",
+      "x-edity-maxLines": 1,
+      "x-edity-maxLinesNarrow": 1
+    },
+    "tests": [
+      {
+        "description": "a long string",
+        "data": "Una frase larga que en una pantalla estrecha ocupa varias líneas",
+        "valid": true
+      },
+      {
+        "description": "a string of three lines",
+        "data": "uno\ndos\ntres",
+        "valid": true
+      },
+      { "description": "a number", "data": 3, "valid": true }
+    ]
+  }
+]

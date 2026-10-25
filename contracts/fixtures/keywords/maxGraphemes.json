@@ -1,0 +1,108 @@
+[
+  {
+    "description": "x-edity-maxGraphemes counts extended grapheme clusters, not code points or UTF-16 code units",
+    "schema": {
+      "$schema": "https://github.com/RMYPG/edity/contracts/v1/schema",
+      "type": "string",
+      "x-edity-maxGraphemes": 5
+    },
+    "tests": [
+      { "description": "five letters", "data": "Hola!", "valid": true },
+      { "description": "six letters", "data": "Hola!?", "valid": false },
+      { "description": "an empty string", "data": "", "valid": true },
+      {
+        "description": "a ZWJ emoji sequence is one",
+        "data": "Hola🧑‍⚕️",
+        "valid": true
+      },
+      {
+        "description": "a ZWJ emoji sequence and one more",
+        "data": "Hola🧑‍⚕️!",
+        "valid": false
+      },
+      {
+        "description": "an emoji with a skin tone modifier is one",
+        "data": "Hola👍🏽",
+        "valid": true
+      },
+      { "description": "a flag is one", "data": "Hola🇪🇸", "valid": true },
+      { "description": "a keycap is one", "data": "Hola1️⃣", "valid": true },
+      {
+        "description": "a letter with a combining accent is one",
+        "data": "Hola\u0301!",
+        "valid": true
+      },
+      {
+        "description": "n with a combining tilde is one",
+        "data": "Pin\u0303a!",
+        "valid": true
+      },
+      {
+        "description": "a precomposed letter is one",
+        "data": "Ñandú",
+        "valid": true
+      },
+      {
+        "description": "conjoining Hangul jamo make one syllable",
+        "data": "\u1112\u1161\u11ab\u1100\u116e\u11a8!!!",
+        "valid": true
+      },
+      { "description": "CRLF is one", "data": "a\r\nbcd", "valid": true },
+      {
+        "description": "five ZWJ emoji sequences of seven code points each",
+        "data": "👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦",
+        "valid": true
+      },
+      {
+        "description": "six ZWJ emoji sequences",
+        "data": "👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦",
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "x-edity-maxGraphemes follows Unicode 15.1 rule GB9c: an Indic conjunct is one grapheme cluster",
+    "comment": "A validator on an older Unicode version splits the conjunct in two.",
+    "schema": {
+      "$schema": "https://github.com/RMYPG/edity/contracts/v1/schema",
+      "type": "string",
+      "x-edity-maxGraphemes": 1
+    },
+    "tests": [
+      {
+        "description": "a Devanagari conjunct with a vowel sign",
+        "data": "क्षि",
+        "valid": true
+      },
+      {
+        "description": "a consonant with a vowel sign",
+        "data": "कि",
+        "valid": true
+      },
+      { "description": "two consonants", "data": "कख", "valid": false }
+    ]
+  },
+  {
+    "description": "x-edity-maxGraphemes applies to strings only",
+    "schema": {
+      "$schema": "https://github.com/RMYPG/edity/contracts/v1/schema",
+      "x-edity-maxGraphemes": 1
+    },
+    "tests": [
+      { "description": "a number", "data": 12345, "valid": true },
+      {
+        "description": "a list of strings",
+        "data": ["ab", "cd"],
+        "valid": true
+      },
+      { "description": "an object", "data": { "a": "bcd" }, "valid": true },
+      { "description": "null", "data": null, "valid": true },
+      { "description": "a boolean", "data": true, "valid": true },
+      {
+        "description": "a string over the maximum",
+        "data": "ab",
+        "valid": false
+      }
+    ]
+  }
+]

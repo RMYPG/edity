@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/RMYPG/edity/contracts/v1/meta/limits",
+  "$dynamicAnchor": "meta",
+  "title": "Edity Limits vocabulary meta-schema",
+  "description": "The keywords of the Limits vocabulary and the values they take. The x-edity- prefix belongs to this vocabulary, so a keyword with that prefix that is not listed here makes the schema invalid.",
+  "type": ["object", "boolean"],
+  "properties": {
+    "x-edity-maxGraphemes": {
+      "description": "Assertion on strings: at most this many extended grapheme clusters (Unicode UAX #29).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "x-edity-decimals": {
+      "description": "Assertion on numbers: the shortest decimal form of the value, as an IEEE 754 double, has at most this many fraction digits.",
+      "type": "integer",
+      "minimum": 0
+    },
+    "x-edity-maxLines": {
+      "description": "Annotation: at most this many rendered lines. The Editor measures them; validators accept any value.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "x-edity-maxLinesNarrow": {
+      "description": "Annotation: at most this many rendered lines on narrow screens. The Editor measures them; validators accept any value.",
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "propertyNames": {
+    "anyOf": [
+      { "not": { "pattern": "^x-edity-" } },
+      {
+        "enum": [
+          "x-edity-maxGraphemes",
+          "x-edity-decimals",
+          "x-edity-maxLines",
+          "x-edity-maxLinesNarrow"
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,186 @@
+[
+  {
+    "description": "the dialect accepts the values the Limits take",
+    "schema": { "$ref": "https://github.com/RMYPG/edity/contracts/v1/schema" },
+    "tests": [
+      {
+        "description": "a text Field",
+        "data": {
+          "type": "string",
+          "x-edity-maxGraphemes": 40,
+          "x-edity-maxLines": 2,
+          "x-edity-maxLinesNarrow": 3
+        },
+        "valid": true
+      },
+      {
+        "description": "a number Field",
+        "data": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 999.99,
+          "x-edity-decimals": 2
+        },
+        "valid": true
+      },
+      {
+        "description": "no decimals",
+        "data": { "type": "number", "x-edity-decimals": 0 },
+        "valid": true
+      },
+      {
+        "description": "many decimals",
+        "data": { "type": "number", "x-edity-decimals": 20 },
+        "valid": true
+      },
+      {
+        "description": "a page with a List",
+        "data": {
+          "type": "object",
+          "properties": {
+            "bullets": {
+              "type": "array",
+              "minItems": 0,
+              "maxItems": 3,
+              "items": {
+                "type": "string",
+                "x-edity-maxGraphemes": 40,
+                "x-edity-maxLines": 2,
+                "x-edity-maxLinesNarrow": 3
+              }
+            }
+          },
+          "required": ["bullets"],
+          "additionalProperties": false
+        },
+        "valid": true
+      },
+      {
+        "description": "a keyword of another vendor",
+        "data": { "x-other": "anything" },
+        "valid": true
+      },
+      { "description": "an empty schema", "data": {}, "valid": true },
+      { "description": "a boolean schema", "data": true, "valid": true }
+    ]
+  },
+  {
+    "description": "the dialect rejects invalid Limit values, also in nested subschemas",
+    "schema": { "$ref": "https://github.com/RMYPG/edity/contracts/v1/schema" },
+    "tests": [
+      {
+        "description": "maxGraphemes as a string",
+        "data": { "x-edity-maxGraphemes": "10" },
+        "valid": false
+      },
+      {
+        "description": "maxGraphemes of zero",
+        "data": { "x-edity-maxGraphemes": 0 },
+        "valid": false
+      },
+      {
+        "description": "maxGraphemes with a fraction",
+        "data": { "x-edity-maxGraphemes": 2.5 },
+        "valid": false
+      },
+      {
+        "description": "negative decimals",
+        "data": { "x-edity-decimals": -1 },
+        "valid": false
+      },
+      {
+        "description": "decimals with a fraction",
+        "data": { "x-edity-decimals": 1.5 },
+        "valid": false
+      },
+      {
+        "description": "decimals as a string",
+        "data": { "x-edity-decimals": "2" },
+        "valid": false
+      },
+      {
+        "description": "maxLines of zero",
+        "data": { "x-edity-maxLines": 0 },
+        "valid": false
+      },
+      {
+        "description": "maxLinesNarrow as a string",
+        "data": { "x-edity-maxLinesNarrow": "2" },
+        "valid": false
+      },
+      {
+        "description": "in a property",
+        "data": { "properties": { "title": { "x-edity-maxGraphemes": 0 } } },
+        "valid": false
+      },
+      {
+        "description": "in the items of a List",
+        "data": { "items": { "x-edity-decimals": -1 } },
+        "valid": false
+      },
+      {
+        "description": "in a List in an Item",
+        "data": {
+          "properties": {
+            "plans": {
+              "items": {
+                "properties": {
+                  "features": { "items": { "x-edity-maxLines": 1.5 } }
+                }
+              }
+            }
+          }
+        },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "the x-edity- prefix belongs to the Limits vocabulary",
+    "comment": "A keyword with the prefix that the vocabulary does not define makes the schema invalid, so a validator never ignores a Limit it does not know.",
+    "schema": { "$ref": "https://github.com/RMYPG/edity/contracts/v1/schema" },
+    "tests": [
+      {
+        "description": "the name of a Limit instead of its keyword",
+        "data": { "x-edity-maxChars": 10 },
+        "valid": false
+      },
+      {
+        "description": "a keyword in the wrong case",
+        "data": { "x-edity-maxgraphemes": 10 },
+        "valid": false
+      },
+      {
+        "description": "an unknown keyword in a property",
+        "data": { "properties": { "title": { "x-edity-minGraphemes": 1 } } },
+        "valid": false
+      }
+    ]
+  },
+  {
+    "description": "the dialect includes the JSON Schema 2020-12 meta-schema",
+    "schema": { "$ref": "https://github.com/RMYPG/edity/contracts/v1/schema" },
+    "tests": [
+      {
+        "description": "a negative minItems",
+        "data": { "minItems": -1 },
+        "valid": false
+      },
+      {
+        "description": "an unknown type",
+        "data": { "type": "text" },
+        "valid": false
+      },
+      {
+        "description": "required as a string",
+        "data": { "required": "title" },
+        "valid": false
+      },
+      {
+        "description": "an invalid property schema",
+        "data": { "properties": { "title": { "type": 1 } } },
+        "valid": false
+      }
+    ]
+  }
+]
