@@ -1,0 +1,6 @@
+# build output
+dist/
+# Builds made by the integration's tests
+.builds/
+# generated types
+.astro/

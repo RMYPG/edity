@@ -1,0 +1,10 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    // Read the workspace's @edity/* packages from source, so checking this
+    // Site needs no build.
+    "customConditions": ["@edity/source"]
+  },
+  "include": [".astro/types.d.ts", "**/*"],
+  "exclude": ["dist"]
+}

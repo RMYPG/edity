@@ -10,6 +10,9 @@ export default mergeConfig(
     },
     test: {
       name: '@edity/astro',
+      // Tests in test/ build the fixture Site, which takes a few seconds.
+      testTimeout: 60_000,
+      hookTimeout: 120_000,
     },
   }),
 );

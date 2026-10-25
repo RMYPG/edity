@@ -1,5 +1,7 @@
 packages:
   - packages/*
+  # The fixture Site the integration and the Editor are tested against.
+  - packages/astro/test/fixture
 
 strictDepBuilds: true
 
