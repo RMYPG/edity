@@ -1,7 +1,7 @@
 // N6: the Editor's text is in Spanish or English, following the Client's
 // locale, then the browser's, then English.
 import type { Locator } from '@playwright/test';
-import { ana, expect, test } from './editor.js';
+import { ana, expect, keepDraft, test } from './editor.js';
 
 /**
  * Every text the Editor shows or gives screen readers, in document order:
@@ -42,6 +42,7 @@ const languages = [
       'Vista de móvil',
       'Vista de visitante',
     ],
+    notice: ['1 cambio ya no se aplica', 'Entendido'],
     preview: 'Vista de móvil',
     visitorView: ['Volver a editar'],
   },
@@ -58,29 +59,46 @@ const languages = [
       'Phone preview',
       'Visitor view',
     ],
+    notice: ['1 change no longer applies', 'OK'],
     preview: 'Phone preview',
     visitorView: ['Back to editing'],
   },
 ];
 
-for (const { locale, bar: barText, preview, visitorView } of languages) {
+for (const {
+  locale,
+  bar: barText,
+  notice,
+  preview,
+  visitorView,
+} of languages) {
   test(`with the session locale "${locale}", all the Editor's text is in that language`, async ({
+    page,
     openEditor,
     editor,
     bar,
     isMobile,
   }) => {
+    // A Draft kept with a Change to a Field the page no longer has, which
+    // the Editor drops and tells the Client about (P2).
+    await keepDraft(page, [
+      { path: 'hero.subtitle', before: 'En tu casa', after: 'Cerca de ti' },
+    ]);
     await openEditor({ session: { ...ana, locale } });
 
     await expect(editor.locator('[lang]')).toHaveAttribute('lang', locale);
-    expect(await editorText(editor)).toEqual(barText);
+    expect(await editorText(editor)).toEqual([...barText, ...notice]);
 
     // A phone has no phone preview.
     if (!isMobile) {
       await bar.getByRole('button', { name: preview }).click();
       await expect(editor.locator('iframe')).toBeVisible();
       // The frame's title names it.
-      expect(await editorText(editor)).toEqual([...barText, preview]);
+      expect(await editorText(editor)).toEqual([
+        ...barText,
+        ...notice,
+        preview,
+      ]);
       await bar.getByRole('button', { name: preview }).click();
     }
 
