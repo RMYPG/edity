@@ -1,0 +1,23 @@
+/*
+ * What the Editor adds to the Site's own Fields that break a Limit (L3, L7).
+ * Each watched document adopts this sheet in the edit view only, and the
+ * attribute is only there then.
+ *
+ * Outlines, like the marks in fields.css, change no layout and so no line
+ * counts. These selectors are more specific than the marks' :hover and
+ * :focus rules, so a red Field stays red while it is hovered or edited.
+ */
+
+/* A Field the Draft changed, over one of its Limits: Publish is disabled. */
+:root [data-edity-field][data-edity-limit='over'],
+:root [data-edity-field][data-edity-limit='over']:is(:hover, :focus) {
+  outline: 2px solid rgb(220 38 38) !important;
+  outline-offset: 2px !important;
+}
+
+/* A Field over one of its Limits as published: only a warning. */
+:root [data-edity-field][data-edity-limit='warning'],
+:root [data-edity-field][data-edity-limit='warning']:is(:hover, :focus) {
+  outline: 2px dashed rgb(217 119 6) !important;
+  outline-offset: 2px !important;
+}

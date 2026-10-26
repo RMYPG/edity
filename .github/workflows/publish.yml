@@ -1,0 +1,52 @@
+name: Publish
+
+# When a package.json changes on main, as a version bump does, runs every
+# check CI runs and stages on npm each package whose version isn't
+# published yet. Nothing is released until a maintainer runs
+# `npm stage approve <stage-id>` with 2FA, core first.
+#
+# npm trusts this workflow by its file name (publish.yml) for @edity/core
+# and @edity/astro, and only to stage: it can't publish directly.
+
+on:
+  push:
+    branches: [main]
+    paths: ['packages/*/package.json']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  stage:
+    if: github.ref == 'refs/heads/main'
+    # npm trusted publishing doesn't support self-hosted runners, such as
+    # Blacksmith's.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Exchanged with npm for a short-lived token, and signs the provenance.
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: jdx/mise-action@82a612c5ab8bcda7cc5db6b7e81a8e7584c3dc6e # v5.2.3
+        with:
+          version: 2026.10.8
+
+      # What gets staged passes every check CI runs, in this same job.
+      - name: Install the browsers for the browser tests
+        run: mise run browsers --with-deps
+
+      - name: Lint, check formatting, type-check, test and check the packages
+        run: mise run ci
+
+      - name: Stage the packages whose version isn't on npm yet
+        run: mise run publish:stage

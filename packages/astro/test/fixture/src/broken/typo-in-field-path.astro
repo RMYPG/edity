@@ -1,0 +1,16 @@
+---
+// A page with a typo in a Field path. It is not in src/pages, so the Site
+// never builds it: the tests inject it as a route to check that the build
+// fails, and `astro check` shows that the typo is a type error too.
+import { editable } from '@edity/astro/editable';
+import { getEntry } from 'astro:content';
+import { homeFields } from '../content.config';
+
+const entry = await getEntry('home', 'home');
+if (!entry) throw new Error('The home page has no content entry');
+const home = editable(homeFields, entry);
+// @ts-expect-error: "hero.titel" is not a Field path of the home page.
+const title = home.field('hero.titel');
+---
+
+<h1 data-edity-field={title}>{entry.data.hero.title}</h1>

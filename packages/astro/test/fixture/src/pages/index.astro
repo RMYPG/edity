@@ -1,0 +1,218 @@
+---
+// The home page of the fixture Site. It holds one of each shape the Editor
+// handles: text Fields (some inside a link and a button), number Fields
+// formatted by the template, a value shown in two places (once inside a
+// link), a List of text Fields and a List of Items with Fields and a nested
+// List.
+import { editable } from '@edity/astro/editable';
+import Items from '@edity/astro/Items.astro';
+import { getEntry } from 'astro:content';
+import { homeFields } from '../content.config';
+
+const entry = await getEntry('home', 'home');
+if (!entry) throw new Error('The home page has no content entry');
+const { brand, hero, stats, visit, contact } = entry.data;
+const home = editable(homeFields, entry);
+const services = home.list('services');
+const plans = home.list('plans');
+
+const euros = new Intl.NumberFormat('es-ES', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+const count = new Intl.NumberFormat('es-ES');
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fisio Sandbox</title>
+  </head>
+  <body data-edity-page={home.page}>
+    <header class="header">
+      <p class="brand" data-edity-field={home.field('brand.name')}>
+        {brand.name}
+      </p>
+    </header>
+
+    <main>
+      <section class="hero">
+        <h1 data-edity-field={home.field('hero.title')}>{hero.title}</h1>
+        <p class="lead" data-edity-field={home.field('hero.lead')}>
+          {hero.lead}
+        </p>
+        <a
+          class="button"
+          href="#contacto"
+          data-edity-field={home.field('hero.cta')}
+        >
+          {hero.cta}
+        </a>
+        <p class="stats">
+          Más de{' '}
+          <strong data-edity-field={home.field('stats.patients')}>
+            {count.format(stats.patients)}
+          </strong>{' '}
+          pacientes atendidos
+        </p>
+      </section>
+
+      <section class="visit">
+        <dl>
+          <dt data-edity-field={home.field('visit.label')}>{visit.label}</dt>
+          <dd>
+            <span data-edity-field={home.field('visit.price')}>
+              {euros.format(visit.price)}
+            </span>{' '}
+            €
+          </dd>
+        </dl>
+      </section>
+
+      <section class="services">
+        <h2>Servicios</h2>
+        <ul data-edity-list={services.path}>
+          <Items of={services}>
+            {(service) => (
+              <li
+                class="service"
+                data-edity-item={service.path}
+                data-edity-field={service.field()}
+              >
+                {service.value}
+              </li>
+            )}
+          </Items>
+        </ul>
+      </section>
+
+      <section class="plans">
+        <h2>Bonos</h2>
+        <div class="cards" data-edity-list={plans.path}>
+          <Items of={plans}>
+            {(plan) => (
+              <article class="card" data-edity-item={plan.path}>
+                <h3 data-edity-field={plan.field('name')}>{plan.value.name}</h3>
+                <p class="price">
+                  <span data-edity-field={plan.field('price')}>
+                    {euros.format(plan.value.price)}
+                  </span>{' '}
+                  € al mes
+                </p>
+                <ul
+                  class="features"
+                  data-edity-list={plan.list('features').path}
+                >
+                  <Items of={plan.list('features')}>
+                    {(feature) => (
+                      <li data-edity-item={feature.path}>
+                        <span class="tick" aria-hidden="true">
+                          ✓
+                        </span>
+                        <span data-edity-field={feature.field()}>
+                          {feature.value}
+                        </span>
+                      </li>
+                    )}
+                  </Items>
+                </ul>
+              </article>
+            )}
+          </Items>
+        </div>
+      </section>
+
+      <section class="contact" id="contacto">
+        <h2 data-edity-field={home.field('contact.title')}>{contact.title}</h2>
+        <form action="#contacto">
+          <button type="submit">
+            <span data-edity-field={home.field('contact.call')}>
+              {contact.call}
+            </span>
+          </button>
+        </form>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        ©
+        <a href="/">
+          <span data-edity-field={home.field('brand.name')}>{brand.name}</span>
+        </a>
+      </p>
+    </footer>
+  </body>
+</html>
+
+<style>
+  body {
+    margin: 0;
+    font-family: system-ui, sans-serif;
+    line-height: 1.5;
+    color: #1d2a33;
+  }
+  main,
+  .header,
+  .footer {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+  .footer a {
+    color: inherit;
+  }
+  h1 {
+    max-width: 24ch;
+    font-size: 3rem;
+    line-height: 1.1;
+  }
+  .lead {
+    max-width: 48ch;
+    font-size: 1.25rem;
+  }
+  .button,
+  button {
+    display: inline-block;
+    padding: 12px 20px;
+    border: 0;
+    border-radius: 8px;
+    background: #0b6e6e;
+    color: #fff;
+    font: inherit;
+    text-decoration: none;
+  }
+  .services ul,
+  .features {
+    padding: 0;
+    list-style: none;
+  }
+  .service {
+    padding: 8px 0;
+    border-bottom: 1px solid #d6e2e2;
+  }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 24px;
+  }
+  .card {
+    padding: 24px;
+    border: 1px solid #d6e2e2;
+    border-radius: 12px;
+  }
+  .price {
+    font-size: 1.5rem;
+  }
+  .tick {
+    margin-right: 8px;
+    color: #0b6e6e;
+  }
+  @media (max-width: 480px) {
+    h1 {
+      font-size: 2.25rem;
+    }
+  }
+</style>

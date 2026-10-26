@@ -1,4 +1,209 @@
 [tools]
 # Listed before node: corepack's pnpm shim in node's bin would otherwise shadow this pinned version.
 "npm:pnpm" = "11.1.2"
-node = "24"
+node = "24.22.1"
+# For the contracts/ Go module. The same version as edity-server.
+go = "1.27.2"
+jactionlint = "2.3.0"
+# jactionlint checks workflow scripts with it.
+shellcheck = "0.11.0"
+
+[env]
+# Use the Go pinned above, and fail rather than download another toolchain.
+GOTOOLCHAIN = "local"
+
+[tasks.deps]
+description = "Install npm dependencies from the lockfile"
+run = "pnpm install --frozen-lockfile"
+sources = [
+  "package.json",
+  "packages/*/package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+]
+outputs = { auto = true }
+
+[tasks.lint]
+description = "Lint the code with ESLint and go vet, check that go.mod is tidy, and lint the GitHub workflows with jactionlint"
+depends = ["deps"]
+run = [
+  "pnpm exec eslint .",
+  "go -C contracts vet ./...",
+  "go -C contracts mod tidy -diff",
+  "jactionlint",
+]
+
+[tasks.format]
+description = "Format every file with Prettier, and the Go code with gofmt"
+depends = ["deps"]
+run = ["pnpm exec prettier --write .", "gofmt -w contracts"]
+
+[tasks."format:check"]
+description = "Check that every file is formatted with Prettier, and the Go code with gofmt"
+depends = ["deps"]
+run = [
+  "pnpm exec prettier --check .",
+  'unformatted=$(gofmt -l contracts); if [ -n "$unformatted" ]; then echo "Not formatted with gofmt: $unformatted"; exit 1; fi',
+]
+
+[tasks.typecheck]
+description = "Type-check every package and the root config files"
+depends = ["deps"]
+run = ["pnpm exec tsc -p tsconfig.json", "pnpm -r typecheck"]
+
+[tasks.test]
+description = "Run every package's tests with Vitest, and the contracts module's with Go"
+# The integration's tests build Sites with the Editor bundle from dist/.
+depends = ["build"]
+run = ["pnpm exec vitest run", "go -C contracts test ./..."]
+
+[tasks.browsers]
+description = "Install the browsers the browser tests run in, at the builds @edity/astro's Playwright expects"
+depends = ["deps"]
+usage = 'flag "--with-deps" help="Also install the system libraries they need, with sudo (for CI)"'
+shell = "bash -c"
+run = '''
+set -euo pipefail
+with_deps=()
+if [ "${usage_with_deps:-false}" = true ]; then with_deps=(--with-deps); fi
+pnpm --filter @edity/astro exec playwright install "${with_deps[@]}" chromium firefox webkit
+'''
+
+[tasks."test:browser"]
+description = "Run the browser tests with Playwright against the built fixture Site, in Chromium, Firefox, WebKit and an iPhone"
+depends = ["build", "browsers"]
+run = "pnpm --filter @edity/astro test:browser"
+
+[tasks.build]
+description = "Build every package into its dist/"
+depends = ["deps"]
+run = "pnpm -r build"
+
+[tasks."check:packages"]
+description = "Pack every package and check it is publishable, with types that resolve"
+depends = ["build"]
+shell = "bash -c"
+run = '''
+set -euo pipefail
+out=$(mktemp -d)
+trap 'rm -rf "$out"' EXIT
+pnpm -r pack --pack-destination "$out" > /dev/null
+for tarball in "$out"/*.tgz; do
+  pnpm exec publint run "$tarball" --strict
+  # .astro components ship as source with no type declarations: Vite compiles
+  # them in the Site, and Astro's tooling reads their Props.
+  pnpm exec attw "$tarball" --profile esm-only --format table-flipped \
+    --exclude-entrypoints ./Items.astro
+done
+'''
+
+[tasks."publish:stage"]
+description = "Stage on npm every package whose version isn't published yet, core first, for a maintainer to approve with `npm stage approve` and 2FA"
+usage = '''
+flag "--dry-run" help="Pack each package and report what npm would stage, without staging anything"
+'''
+depends = ["build"]
+shell = "bash -c"
+run = '''
+set -euo pipefail
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+dry_run=()
+if [ "${usage_dry_run:-false}" = true ]; then dry_run=(--dry-run); fi
+# Core first: @edity/astro depends on it, so approve it first too.
+for dir in packages/core packages/astro; do
+  name=$(node -p "require('./$dir/package.json').name")
+  version=$(node -p "require('./$dir/package.json').version")
+  if found=$(npm view "$name@$version" version 2>&1); then
+    echo "$name@$version is on npm already"
+    continue
+  elif ! grep -q E404 <<< "$found"; then
+    echo "$found" >&2
+    exit 1
+  fi
+  # npm packs a folder as it is, so it would ship astro's workspace:
+  # dependency on core. pnpm's tarball has the version instead, and npm
+  # stages that tarball's contents.
+  tarball=$(cd "$dir" && pnpm pack --json --pack-destination "$work" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).filename")
+  unpacked="$work/$(basename "$tarball" .tgz)"
+  mkdir "$unpacked"
+  tar -xzf "$tarball" -C "$unpacked"
+  echo "Staging $name@$version"
+  (cd "$unpacked/package" && npm stage publish --provenance "${dry_run[@]}")
+done
+'''
+
+[tasks."contracts:fetch"]
+description = "Fetch a contracts version with `go get` in a scratch module and load its files: a pushed tag, or with --local the committed HEAD tagged in a scratch clone"
+usage = '''
+arg "<version>" help="The version, without the contracts/ prefix of its tag, such as v0.1.0"
+flag "--local" help="Tag HEAD in a scratch clone and fetch from it instead of from GitHub through the Go proxy"
+'''
+shell = "bash -c"
+run = '''
+set -euo pipefail
+module=github.com/RMYPG/edity/contracts
+version=$usage_version
+work=$(mktemp -d)
+trap 'chmod -R u+w "$work"; rm -rf "$work"' EXIT
+# A scratch module cache, so a version fetched from a local tag never reaches
+# the real one.
+export GOMODCACHE="$work/mod" GOFLAGS=-modcacherw
+if [ "${usage_local:-false}" = true ]; then
+  git clone --quiet --no-checkout "$MISE_PROJECT_ROOT" "$work/edity"
+  git -C "$work/edity" tag -f "contracts/$version" "$(git -C "$MISE_PROJECT_ROOT" rev-parse HEAD)" > /dev/null
+  # go fetches the module from git, as the Go proxy does, but from the clone.
+  export GOPRIVATE=github.com/RMYPG/edity
+  export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="url.$work/edity.insteadOf" GIT_CONFIG_VALUE_0=https://github.com/RMYPG/edity
+fi
+mkdir "$work/consumer"
+cd "$work/consumer"
+go mod init example.com/consumer 2> /dev/null
+go get "$module@$version"
+cat > main.go << 'EOF'
+package main
+
+import (
+	"fmt"
+	"log"
+
+	"github.com/RMYPG/edity/contracts"
+)
+
+func main() {
+	fixtures, err := contracts.Fixtures()
+	if err != nil {
+		log.Fatal(err)
+	}
+	tests := 0
+	for _, fixture := range fixtures {
+		for _, c := range fixture.Cases {
+			tests += len(c.Tests)
+		}
+	}
+	metaSchemas := contracts.MetaSchemas()
+	if len(metaSchemas) != 2 || tests == 0 {
+		log.Fatalf("%d meta-schemas and %d tests", len(metaSchemas), tests)
+	}
+	fmt.Printf("%d meta-schemas, %d fixture files, %d tests\n", len(metaSchemas), len(fixtures), tests)
+}
+EOF
+go run .
+dir=$(go list -m -f '{% raw %}{{.Dir}}{% endraw %}' "$module")
+if [ ! -f "$dir/LICENSE" ]; then
+  echo "$module@$version has no LICENSE, so pkg.go.dev will not show its documentation"
+  exit 1
+fi
+go list -m "$module"
+'''
+
+[tasks.ci]
+description = "Run every check CI runs"
+depends = [
+  "format:check",
+  "lint",
+  "typecheck",
+  "test",
+  "test:browser",
+  "check:packages",
+]

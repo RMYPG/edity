@@ -1,0 +1,62 @@
+{
+  "name": "@edity/astro",
+  "version": "0.1.0",
+  "description": "Astro integration and inline Editor for Edity.",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RMYPG/edity.git",
+    "directory": "packages/astro"
+  },
+  "homepage": "https://github.com/RMYPG/edity/tree/main/packages/astro#readme",
+  "bugs": "https://github.com/RMYPG/edity/issues",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "@edity/source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./editable": {
+      "@edity/source": "./src/editable.ts",
+      "types": "./dist/editable.d.ts",
+      "default": "./dist/editable.js"
+    },
+    "./loaders": {
+      "@edity/source": "./src/loaders.ts",
+      "types": "./dist/loaders.d.ts",
+      "default": "./dist/loaders.js"
+    },
+    "./Items.astro": "./src/Items.astro"
+  },
+  "files": [
+    "dist",
+    "src",
+    "!src/**/*.test.ts"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && vite build -c vite.editor.config.ts",
+    "typecheck": "tsc -p tsconfig.json && tsc -p src/editor/tsconfig.json && tsc -p test/browser/tsconfig.json",
+    "test": "vitest run",
+    "test:browser": "playwright test"
+  },
+  "dependencies": {
+    "@edity/core": "workspace:^"
+  },
+  "peerDependencies": {
+    "astro": "^7.4.0",
+    "zod": "^4.6.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "@preact/signals": "^2.11.3",
+    "astro": "^7.4.2",
+    "preact": "^11.0.1",
+    "vite": "^8.3.5",
+    "zod": "^4.6.7"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src", "test/*.ts", "*.ts"],
+  // The Editor and the browser tests have their own tsconfig.json, with the
+  // DOM's types.
+  "exclude": ["src/editor"]
+}

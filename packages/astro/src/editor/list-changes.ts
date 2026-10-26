@@ -1,0 +1,157 @@
+// The Changes a List on the page makes (S7), apart from the DOM: one Change
+// for the whole List once Items were added, removed or reordered in it, else
+// a Change for each of its Items' Fields, and for each List inside them, that
+// the Client edited.
+import type {
+  Definition,
+  ListDefinition,
+  ObjectDefinition,
+  TextDefinition,
+} from '@edity/core';
+import type { PageMarker } from '../editable.js';
+import { blankValue } from '../markup.js';
+import { childPath } from '../paths.js';
+import { definitionAt, fieldChange, sameValue, valueAt } from './content.js';
+import type { Change, ContentValue } from './draft.js';
+
+/** A List as the page shows it now. */
+export interface ListNow {
+  readonly items: readonly ItemNow[];
+}
+
+/** An Item as the page shows it now. */
+export interface ItemNow {
+  /**
+   * Its index in the List as built, or `undefined` for an Item added in this
+   * Draft. Items keep it wherever they move.
+   */
+  readonly origin: number | undefined;
+  /** Its value now: its text, or its Fields' values and its List's Items. */
+  readonly value: ContentValue;
+  /** The Lists inside it that the page shows, by key. */
+  readonly lists?: { readonly [key: string]: ListNow };
+}
+
+/** The definition of the List at `path`, such as `plans.1.features`. */
+export function listAt(
+  fields: ObjectDefinition,
+  path: string,
+): ListDefinition | undefined {
+  const definition = definitionAt(fields, path);
+  return definition?.kind === 'list' ? definition : undefined;
+}
+
+/**
+ * The Changes the List at `path` makes when the page shows it as `list`,
+ * with `before` from the page's built content (P3).
+ */
+export function listChanges(
+  page: PageMarker,
+  path: string,
+  list: ListNow,
+): Change[] {
+  const definition = listAt(page.fields, path);
+  const before = valueAt(page.content, path);
+  if (definition === undefined || !Array.isArray(before)) return [];
+  const asBuilt =
+    list.items.length === before.length &&
+    list.items.every((item, index) => item.origin === index);
+  if (!asBuilt) {
+    const after = list.items.map((item) => item.value);
+    const origins = list.items.map((item) => item.origin ?? null);
+    return sameValue(before, after) ? [] : [{ path, before, after, origins }];
+  }
+  return list.items.flatMap((item, index) =>
+    itemChanges(page, definition.item, childPath(path, index), item),
+  );
+}
+
+function itemChanges(
+  page: PageMarker,
+  definition: TextDefinition | ObjectDefinition,
+  path: string,
+  item: ItemNow,
+): Change[] {
+  if (definition.kind === 'text') return changed(page, path, item.value);
+  const value = item.value as { readonly [key: string]: ContentValue };
+  return Object.entries(definition.shape).flatMap(([key, field]) => {
+    const at = childPath(path, key);
+    if (field.kind !== 'list') return changed(page, at, value[key]);
+    // A List the template does not show is as built.
+    const shown = item.lists?.[key];
+    return shown === undefined ? [] : listChanges(page, at, shown);
+  });
+}
+
+function changed(
+  page: PageMarker,
+  path: string,
+  value: ContentValue | undefined,
+): Change[] {
+  const change =
+    value === undefined ? undefined : fieldChange(page, path, value);
+  return change === undefined ? [] : [change];
+}
+
+/**
+ * Which built Item each Item of `value` is: the first one not taken yet
+ * that holds an equal value, or `undefined` for none. A List shown from a
+ * value, such as a restored Draft's, gets its Items' places back this way,
+ * and so stays one Change when its structure changed.
+ */
+export function originsOf(
+  built: readonly ContentValue[],
+  value: readonly ContentValue[],
+): (number | undefined)[] {
+  const taken = new Set<number>();
+  return value.map((item) => {
+    const origin = built.findIndex(
+      (each, index) => !taken.has(index) && sameValue(each, item),
+    );
+    if (origin === -1) return undefined;
+    taken.add(origin);
+    return origin;
+  });
+}
+
+/**
+ * Which built Item each Item of a List Change's `after` is: the `origins`
+ * the Draft kept with it, while the List as built is still the one the
+ * Change was first made on (its `before`), so an edited Item stays the Item
+ * it was. Else, as after a newer Release, they are matched by value
+ * (`originsOf`). Kept origins that don't fit `after` and `built` are
+ * ignored.
+ */
+export function changeOrigins(
+  built: readonly ContentValue[],
+  { before, after, origins }: Pick<Change, 'before' | 'after' | 'origins'>,
+): (number | undefined)[] {
+  const items = Array.isArray(after) ? (after as readonly ContentValue[]) : [];
+  const kept = new Set<number>();
+  const fits =
+    origins !== undefined &&
+    origins.length === items.length &&
+    sameValue(before, built) &&
+    origins.every((origin) => {
+      if (origin === null) return true;
+      const fresh =
+        Number.isInteger(origin) &&
+        origin >= 0 &&
+        origin < built.length &&
+        !kept.has(origin);
+      kept.add(origin);
+      return fresh;
+    });
+  return fits
+    ? origins.map((origin) => origin ?? undefined)
+    : originsOf(built, items);
+}
+
+/**
+ * What a new Item, or a value in it, holds until the Client fills it in: its
+ * List's blank Item (see `blankValue`), with every number Field empty. That
+ * is text and no number yet, so Publish waits until the Client types one.
+ */
+export function newItemValue(definition: Definition): ContentValue {
+  return blankValue(definition, () => '');
+}

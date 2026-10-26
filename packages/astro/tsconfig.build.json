@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "customConditions": [],
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src"],
+  // The Editor ships as the one bundle Vite writes (vite.editor.config.ts).
+  "exclude": ["src/**/*.test.ts", "src/editor"]
+}

@@ -1,0 +1,33 @@
+---
+// A page that shows one List in two places. It is not in src/pages, so the
+// Site never builds it: the tests inject it as a route to check that the
+// build fails, since the Editor edits a List in one place only.
+import { editable } from '@edity/astro/editable';
+import Items from '@edity/astro/Items.astro';
+import { getEntry } from 'astro:content';
+import { homeFields } from '../content.config';
+
+const entry = await getEntry('home', 'home');
+if (!entry) throw new Error('The home page has no content entry');
+const home = editable(homeFields, entry);
+const services = home.list('services');
+---
+
+<ul data-edity-list={services.path}>
+  <Items of={services}>
+    {(service) => (
+      <li data-edity-item={service.path} data-edity-field={service.field()}>
+        {service.value}
+      </li>
+    )}
+  </Items>
+</ul>
+<ul data-edity-list={services.path}>
+  <Items of={services}>
+    {(service) => (
+      <li data-edity-item={service.path} data-edity-field={service.field()}>
+        {service.value}
+      </li>
+    )}
+  </Items>
+</ul>

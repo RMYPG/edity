@@ -1,0 +1,23 @@
+---
+// Renders the Items of a List, then the List's <template> with one blank
+// Item, from the function given as children:
+//
+//   <ul data-edity-list={plans.path}>
+//     <Items of={plans}>
+//       {(plan) => <li data-edity-item={plan.path}>…</li>}
+//     </Items>
+//   </ul>
+import type { ItemScope, ListScope } from '@edity/astro/editable';
+
+interface Props<I> {
+  /** The List, from `page.list()` or `item.list()`. */
+  of: ListScope<I>;
+  /** Renders one Item. Its root element carries `data-edity-item`. */
+  children: (item: ItemScope<I>) => unknown;
+}
+
+const { of: list } = Astro.props;
+const html = await list.render((item) => Astro.slots.render('default', [item]));
+---
+
+<Fragment set:html={html} />

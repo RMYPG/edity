@@ -1,0 +1,46 @@
+/*
+ * What the Editor adds to the Site's own Fields while editing (E1). The
+ * document adopts this sheet in the edit view only, and the rules only match
+ * Fields the Editor made editable, so the visitor view has none of it.
+ *
+ * Marks are outlines, which change no layout and so no line counts. They are
+ * !important so a Site's own `outline: none` cannot hide them.
+ */
+[data-edity-field][contenteditable] {
+  cursor: text !important;
+  -webkit-touch-callout: none;
+}
+
+@media (hover: hover) {
+  [data-edity-field][contenteditable]:hover {
+    outline: 2px dashed rgb(59 130 246 / 0.7) !important;
+    outline-offset: 2px !important;
+  }
+}
+
+/* A touch screen cannot hover, so every Field is faintly marked. */
+@media (hover: none) {
+  [data-edity-field][contenteditable] {
+    outline: 1px dashed rgb(59 130 246 / 0.45) !important;
+    outline-offset: 2px !important;
+  }
+}
+
+[data-edity-field][contenteditable]:focus {
+  outline: 2px solid rgb(59 130 246) !important;
+  outline-offset: 2px !important;
+}
+
+/* An empty Field keeps a line's height and some width, so it can be clicked
+   again. */
+[data-edity-field][contenteditable]:empty::before {
+  content: '\200b';
+  display: inline-block;
+  min-width: 1ch;
+}
+
+/* A long press on a link that holds a Field selects its text instead of
+   opening the link's menu. */
+a[href]:has([data-edity-field][contenteditable]) {
+  -webkit-touch-callout: none;
+}

@@ -12,5 +12,17 @@ Add a workflow to the Site template that runs the existing release logic automat
 ## Acceptance criteria
 
 - [ ] A bot-authored commit on `main` produces a `vX.Y.Z` tag and image after CI passes
-- [ ] Developer commits keep the manual release flow
-- [ ] The existing version checks in `release.yml` still pass, because the commit already bumped `package.json`
+- [x] Developer commits keep the manual release flow
+- [x] The existing version checks in `release.yml` still pass, because the commit already bumped `package.json`
+
+## Comments
+
+2026-10-26: Built in two draft PRs with the same diff, both with `quality` and `build` green: [RMYPG/static-astro-site-template#12](https://github.com/RMYPG/static-astro-site-template/pull/12) and [RMYPG/edity-sandbox#1](https://github.com/RMYPG/edity-sandbox/pull/1).
+- **`release-on-publish.yml`:** when CI succeeds on a push to `main`, it calls `release.yml` with the sha CI ran on. It does this only if the pushing login is listed in the `EDITY_PUBLISHER_LOGINS` repository variable (comma-separated, no spaces).
+- **`release.yml`:** now accepts that sha. A called run whose commit an existing `vX.Y.Z` tag already contains ends green with a notice. The concurrency group moved to the job.
+- **Checked:**
+  - The trigger condition, with act against a stub `release.yml` (8 cases): Developer pushes, failed CI, pull requests, an unset variable and partial login matches release nothing.
+  - The version step, on scratch git histories (7 cases).
+- **Left open:** the first criterion needs a real run. `workflow_run` only fires from `main`, so merge the sandbox PR, then run `gh variable set EDITY_PUBLISHER_LOGINS --repo RMYPG/edity-sandbox --body 'edity-publisher[bot]'`. After that, the first commit the App pushes to `main` should produce a tag and image. Ticket 28 changes the value to `edity-publisher-dev[bot]`.
+
+2026-10-26: `EDITY_PUBLISHER_LOGINS=edity-publisher[bot]` is already set on `edity-sandbox` (since 2026-10-25), so the `gh variable set` step above is done. What remains is to merge the sandbox PR and get a real Publish commit released. Setting the variable as code instead of by hand is ticket 34.

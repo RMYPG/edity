@@ -1,0 +1,142 @@
+/*
+ * The List controls, in the Editor's shadow root (see ListControls.tsx), on
+ * top of editor.css. Their root sits at the page's origin, so each control
+ * is placed in page coordinates and scrolls with the Site's elements.
+ */
+.lists {
+  position: absolute;
+  z-index: 2147483646;
+  top: 0;
+  left: 0;
+}
+
+.item-bar,
+.list-bar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* A long press on a control neither selects text nor opens a menu. */
+.item-bar,
+.item-bar *,
+.list-bar,
+.list-bar * {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.item-bar,
+.list-bar .add,
+.reason,
+.undo {
+  border-radius: 10px;
+  background: var(--edity-surface);
+  box-shadow: var(--edity-shadow);
+}
+
+/* Above the end of the Item, just overlapping it, so the pointer can reach
+   it without leaving the Item. */
+.item-bar {
+  padding: 3px;
+  transform: translate(-100%, calc(-100% + 6px));
+}
+
+.item-bar button {
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 7px;
+}
+
+/* The page does not scroll from the handle: a finger on it drags. */
+.handle {
+  cursor: grab;
+  touch-action: none;
+}
+
+.grip {
+  fill: currentColor;
+  stroke: none;
+}
+
+.list-bar {
+  gap: 6px;
+}
+
+.list-bar .add {
+  height: 32px;
+  padding: 0 12px 0 8px;
+}
+
+.reason {
+  padding: 6px 10px;
+  color: var(--edity-muted);
+  font-size: 13px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* Fingers need room: 44 px targets. */
+@media (pointer: coarse) {
+  .item-bar button {
+    width: 44px;
+    height: 44px;
+  }
+
+  .list-bar .add {
+    height: 44px;
+  }
+}
+
+.dragged {
+  position: absolute;
+  border: 2px solid var(--edity-accent);
+  border-radius: 6px;
+  background: rgb(59 130 246 / 0.08);
+  pointer-events: none;
+}
+
+.undo {
+  position: fixed;
+  z-index: 2147483647;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 16px);
+  padding: 6px 6px 6px 14px;
+  transform: translateX(-50%);
+}
+
+.undo span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.undo button {
+  color: var(--edity-focus);
+  font-weight: 600;
+}
+
+.live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (hover: hover) {
+  .item-bar button:not(:disabled):hover,
+  .list-bar .add:not(:disabled):hover,
+  .undo button:hover {
+    background: var(--edity-surface-hover);
+  }
+}
