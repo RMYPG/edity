@@ -68,3 +68,13 @@ test('a typo in a Field path fails the build and names the path', async () => {
     'Unknown Field path "hero.titel" in page "home"',
   );
 });
+
+test('a List shown twice on a page fails the build and names the List', async () => {
+  const build = buildFixture({
+    routes: { '/twice': './src/broken/list-rendered-twice.astro' },
+  });
+
+  await expect(build).rejects.toThrow(
+    'The List "services" is rendered twice in page "home"',
+  );
+});

@@ -81,7 +81,9 @@ export interface ListScope<I> {
   readonly items: readonly ItemScope<I>[];
   /**
    * Renders every Item with `renderItem`, then the List's `<template>`, which
-   * holds one blank Item rendered the same way. `<Items>` calls it.
+   * holds one blank Item rendered the same way. `<Items>` calls it. A page
+   * renders each List once: the Editor edits a List in one place, unlike a
+   * Field, which it updates wherever it is shown (E7).
    */
   render(
     renderItem: (item: ItemScope<I>) => string | Promise<string>,
@@ -175,7 +177,11 @@ export function editable<D extends FieldDefinitions<any>>(
       '[edity] editable() takes Field definitions made with defineFields()',
     );
   }
-  const page: Page = { name: entry.collection, ...__EDITY_OPTIONS__ };
+  const page: Page = {
+    name: entry.collection,
+    ...__EDITY_OPTIONS__,
+    rendered: new Set(),
+  };
   const marker: PageMarker = {
     page: page.name,
     fields: root,
@@ -201,6 +207,8 @@ export function editable<D extends FieldDefinitions<any>>(
 
 interface Page extends HelperOptions {
   readonly name: string;
+  /** The paths of the Lists this render of the page has rendered so far. */
+  readonly rendered: Set<string>;
 }
 
 interface PageScope {
@@ -281,6 +289,13 @@ function list(
     path: page.enabled ? path : undefined,
     items,
     async render(renderItem) {
+      // The Editor records the moves in one element per List, the first one.
+      if (page.enabled && page.rendered.has(path)) {
+        throw new Error(
+          `[edity] The List "${path}" is rendered twice in page "${page.name}": show a List in one place only. A Field can be shown in several`,
+        );
+      }
+      page.rendered.add(path);
       let html = '';
       for (const item of items) {
         html += rooted(page, await renderItem(item), item);

@@ -188,36 +188,40 @@ describe('a List of Items with Fields and a nested List', () => {
 });
 
 describe('rendering the Items of a List', () => {
-  const short = editable(fields, {
-    collection: 'home',
-    data: {
-      ...content,
-      plans: [{ name: 'Básico', price: 19.99, features: ['Una sesión'] }],
-    },
-  });
+  // A page's scope, as one render of the page makes it.
+  const short = () =>
+    editable(fields, {
+      collection: 'home',
+      data: {
+        ...content,
+        plans: [{ name: 'Básico', price: 19.99, features: ['Una sesión'] }],
+      },
+    });
 
   test('ends with a template holding a blank Item at the next position', async () => {
-    const html = await short.list('plans').render(async (plan) => {
-      const features = plan.list('features');
-      const bullets = await features.render((feature) =>
-        tag(
-          'li',
-          { item: feature.path, field: feature.field() },
-          feature.value,
-        ),
-      );
-      return tag(
-        'article',
-        { item: plan.path },
-        tag('h3', { field: plan.field('name') }, plan.value.name) +
+    const html = await short()
+      .list('plans')
+      .render(async (plan) => {
+        const features = plan.list('features');
+        const bullets = await features.render((feature) =>
           tag(
-            'p',
-            { field: plan.field('price') },
-            plan.value.price.toFixed(2),
-          ) +
-          tag('ul', { list: features.path }, bullets),
-      );
-    });
+            'li',
+            { item: feature.path, field: feature.field() },
+            feature.value,
+          ),
+        );
+        return tag(
+          'article',
+          { item: plan.path },
+          tag('h3', { field: plan.field('name') }, plan.value.name) +
+            tag(
+              'p',
+              { field: plan.field('price') },
+              plan.value.price.toFixed(2),
+            ) +
+            tag('ul', { list: features.path }, bullets),
+        );
+      });
 
     expect(html).toBe(
       '<article data-edity-item="plans.0">' +
@@ -246,7 +250,7 @@ describe('rendering the Items of a List', () => {
   });
 
   test('throws when the markup of an Item does not start with its root element', async () => {
-    const render = short
+    const render = short()
       .list('plans')
       .render((plan) =>
         tag('div', {}, tag('article', { item: plan.path }, plan.value.name)),
@@ -255,5 +259,36 @@ describe('rendering the Items of a List', () => {
     await expect(render).rejects.toThrow(
       'The Item "plans.0" in page "home" must start with its root element, marked with data-edity-item={item.path}',
     );
+  });
+
+  test('throws when a page renders the same List twice, which the Editor could edit in one place only', async () => {
+    const page = short();
+    const bullet = (item: { path: string | undefined; value: string }) =>
+      tag('li', { item: item.path, field: item.path }, item.value);
+    await page.list('services').render(bullet);
+
+    await expect(page.list('services').render(bullet)).rejects.toThrow(
+      'The List "services" is rendered twice in page "home": show a List in one place only. A Field can be shown in several',
+    );
+  });
+
+  test('renders the nested Lists of different Items, each once', async () => {
+    const page = short();
+
+    await expect(
+      page
+        .list('plans')
+        .render(async (plan) =>
+          tag(
+            'article',
+            { item: plan.path },
+            await plan
+              .list('features')
+              .render((feature) =>
+                tag('li', { item: feature.path }, feature.value),
+              ),
+          ),
+        ),
+    ).resolves.toContain('data-edity-template="plans.1.features"');
   });
 });
