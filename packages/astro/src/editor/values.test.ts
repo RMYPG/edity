@@ -78,6 +78,24 @@ describe('numberValue', () => {
     expect(numberValue('1e3', 2)).toBeUndefined();
     expect(numberValue('12,34', 2)).toBe(12.34);
   });
+
+  test('is undefined for digits too many for a number, which would be Infinity', () => {
+    expect(numberValue('9'.repeat(309), 0)).toBeUndefined();
+    expect(numberValue('9'.repeat(308), 0)).toBe(Number('9'.repeat(308)));
+  });
+});
+
+describe('fieldValue of a number Field', () => {
+  test('keeps digits too many for a number as the text typed, which JSON can hold', () => {
+    const typed = '9'.repeat(309);
+
+    expect(fieldValue(count, typed)).toBe(typed);
+    expect(
+      JSON.parse(JSON.stringify({ after: fieldValue(count, typed) })),
+    ).toEqual({
+      after: typed,
+    });
+  });
 });
 
 describe('isNumberText (E5)', () => {

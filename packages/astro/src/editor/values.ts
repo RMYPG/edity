@@ -31,7 +31,8 @@ export function fieldValue(
 
 /**
  * The number `text` stands for, if it has digits, at most one comma or dot
- * and at most `decimals` digits after it.
+ * and at most `decimals` digits after it, and is not too big for a number:
+ * that would be Infinity, which JSON keeps as `null`.
  */
 export function numberValue(
   text: string,
@@ -41,7 +42,8 @@ export function numberValue(
   if (match === null || !/\d/.test(text)) return undefined;
   const [, whole = '', fraction = ''] = match;
   if (fraction.length > decimals) return undefined;
-  return Number(`${whole || '0'}.${fraction || '0'}`);
+  const value = Number(`${whole || '0'}.${fraction || '0'}`);
+  return Number.isFinite(value) ? value : undefined;
 }
 
 /**
