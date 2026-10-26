@@ -1,54 +1,20 @@
 // P6 and L6: a phone-width preview shows the Draft at 390 px, with the
 // Site's own CSS for that width, and Limits checked there.
-import type { FrameLocator, Locator, Page } from '@playwright/test';
-import { expect, recordRequests, test } from './editor.js';
-
-/** The outline of a Field the Draft changed over a Limit (L3). */
-const red = 'rgb(220, 38, 38)';
+import {
+  editAll,
+  editAtEnd,
+  expect,
+  field,
+  lines,
+  recordRequests,
+  red,
+  test,
+} from './editor.js';
 
 const built = {
   lead: 'Sesiones individuales de una hora, con un plan pensado para tu lesión y para tu ritmo de vida.',
   cta: 'Reserva tu cita',
 };
-
-/** The elements of `page`, or of the preview's page, that show `path`. */
-function field(page: Page | FrameLocator, path: string): Locator {
-  return page.locator(`[data-edity-field="${path}"]`);
-}
-
-/** Clicks into the Field at `path` and selects its text. */
-async function editAll(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  await locator.click();
-  await expect(locator).toBeFocused();
-  await page.keyboard.press('ControlOrMeta+A');
-  return locator;
-}
-
-/** Clicks into the Field at `path` and puts the caret at its end. */
-async function editAtEnd(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  await locator.click();
-  await expect(locator).toBeFocused();
-  await locator.evaluate((element) => {
-    const range = element.ownerDocument.createRange();
-    range.selectNodeContents(element);
-    range.collapse(false);
-    getSelection()!.removeAllRanges();
-    getSelection()!.addRange(range);
-  });
-  return locator;
-}
-
-/** The lines a block element takes, from its height and line height. */
-function lines(block: Locator): Promise<number> {
-  return block.evaluate((element) =>
-    Math.round(
-      (element as HTMLElement).offsetHeight /
-        parseFloat(getComputedStyle(element).lineHeight),
-    ),
-  );
-}
 
 test.describe('on a wide screen', () => {
   test.skip(({ isMobile }) => isMobile, 'a phone shows the page at its width');

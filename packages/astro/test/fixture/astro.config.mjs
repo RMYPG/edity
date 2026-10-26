@@ -1,11 +1,13 @@
 // @ts-check
-import edity from '@edity/astro';
 import { defineConfig } from 'astro/config';
 import mockApi from './mock-api.mjs';
+import { siteConfig } from './site-config.ts';
 
-// Tests that build this Site from Vitest pass the same config inline (see
-// packages/astro/test/build-fixture.ts), so keep the two in step. mockApi()
-// only acts under `astro dev`, so builds need not repeat it.
+// The tests that build this Site from Vitest start from siteConfig() too.
+// mockApi() only acts under `astro dev`, so they leave it out.
+const config = siteConfig();
+
 export default defineConfig({
-  integrations: [edity(), mockApi()],
+  ...config,
+  integrations: [...config.integrations, mockApi()],
 });

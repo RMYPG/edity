@@ -28,7 +28,8 @@ export interface ListMessages {
   readonly undo: string;
 }
 
-const items = (count: number, one: string, many: string) =>
+/** `count` and the noun for that many: `1 item`, `3 items`. */
+const counted = (count: number, one: string, many: string) =>
   `${count} ${count === 1 ? one : many}`;
 
 export const listMessages: Readonly<Record<Locale, ListMessages>> = {
@@ -39,8 +40,8 @@ export const listMessages: Readonly<Record<Locale, ListMessages>> = {
       within === undefined
         ? 'Añadir elemento'
         : `Añadir elemento a «${within}»`,
-    atMost: (max) => `Máximo ${items(max, 'elemento', 'elementos')}`,
-    atLeast: (min) => `Mínimo ${items(min, 'elemento', 'elementos')}`,
+    atMost: (max) => `Máximo ${counted(max, 'elemento', 'elementos')}`,
+    atLeast: (min) => `Mínimo ${counted(min, 'elemento', 'elementos')}`,
     drag: (name) => `Arrastrar «${name}»`,
     moveUp: (name) => `Subir «${name}»`,
     moveDown: (name) => `Bajar «${name}»`,
@@ -57,8 +58,8 @@ export const listMessages: Readonly<Record<Locale, ListMessages>> = {
     add: 'Add',
     addTo: (within) =>
       within === undefined ? 'Add item' : `Add item to “${within}”`,
-    atMost: (max) => `At most ${items(max, 'item', 'items')}`,
-    atLeast: (min) => `At least ${items(min, 'item', 'items')}`,
+    atMost: (max) => `At most ${counted(max, 'item', 'items')}`,
+    atLeast: (min) => `At least ${counted(min, 'item', 'items')}`,
     drag: (name) => `Drag “${name}”`,
     moveUp: (name) => `Move “${name}” up`,
     moveDown: (name) => `Move “${name}” down`,

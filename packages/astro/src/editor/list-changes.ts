@@ -9,7 +9,9 @@ import type {
   TextDefinition,
 } from '@edity/core';
 import type { PageMarker } from '../editable.js';
-import { definitionAt, fieldChange, valueAt } from './content.js';
+import { blankValue } from '../markup.js';
+import { childPath } from '../paths.js';
+import { definitionAt, fieldChange, sameValue, valueAt } from './content.js';
 import type { Change, ContentValue } from './draft.js';
 
 /** A List as the page shows it now. */
@@ -40,35 +42,6 @@ export function listAt(
 }
 
 /**
- * The path of the outermost List that `path` is inside: `plans` for
- * `plans.1.features.0` and for `plans.1.features`. `undefined` for a path
- * outside Lists, such as `hero.title` or `plans` itself.
- */
-export function listPathOf(path: string): string | undefined {
-  const keys = path.split('.');
-  const index = keys.findIndex((key) => /^\d+$/.test(key));
-  if (index > 0) return keys.slice(0, index).join('.');
-  return undefined;
-}
-
-/**
- * The Item a Field at `path` belongs to, and the Field's key in it: `plans.1`
- * and `price` for `plans.1.price`, `services.2` and `''` for `services.2`.
- * `undefined` outside Lists.
- */
-export function itemPathOf(
-  path: string,
-): { readonly item: string; readonly key: string } | undefined {
-  const keys = path.split('.');
-  const index = keys.findLastIndex((key) => /^\d+$/.test(key));
-  if (index < 1) return undefined;
-  return {
-    item: keys.slice(0, index + 1).join('.'),
-    key: keys.slice(index + 1).join('.'),
-  };
-}
-
-/**
  * The Changes the List at `path` makes when the page shows it as `list`,
  * with `before` from the page's built content (P3).
  */
@@ -85,10 +58,10 @@ export function listChanges(
     list.items.every((item, index) => item.origin === index);
   if (!asBuilt) {
     const after = list.items.map((item) => item.value);
-    return equal(before, after) ? [] : [{ path, before, after }];
+    return sameValue(before, after) ? [] : [{ path, before, after }];
   }
   return list.items.flatMap((item, index) =>
-    itemChanges(page, definition.item, `${path}.${index}`, item),
+    itemChanges(page, definition.item, childPath(path, index), item),
   );
 }
 
@@ -101,7 +74,7 @@ function itemChanges(
   if (definition.kind === 'text') return changed(page, path, item.value);
   const value = item.value as { readonly [key: string]: ContentValue };
   return Object.entries(definition.shape).flatMap(([key, field]) => {
-    const at = `${path}.${key}`;
+    const at = childPath(path, key);
     if (field.kind !== 'list') return changed(page, at, value[key]);
     // A List the template does not show is as built.
     const shown = item.lists?.[key];
@@ -132,7 +105,7 @@ export function originsOf(
   const taken = new Set<number>();
   return value.map((item) => {
     const origin = built.findIndex(
-      (each, index) => !taken.has(index) && equal(each, item),
+      (each, index) => !taken.has(index) && sameValue(each, item),
     );
     if (origin === -1) return undefined;
     taken.add(origin);
@@ -141,58 +114,10 @@ export function originsOf(
 }
 
 /**
- * What a new Item holds until the Client fills it in: empty Fields, which a
- * number Field holds as text that is not a number yet, and the fewest Items
- * its List takes.
+ * What a new Item, or a value in it, holds until the Client fills it in: its
+ * List's blank Item (see `blankValue`), with every number Field empty. That
+ * is text and no number yet, so Publish waits until the Client types one.
  */
-export function blankValue(definition: Definition): ContentValue {
-  switch (definition.kind) {
-    case 'text':
-    case 'number':
-      return '';
-    case 'list':
-      return Array.from({ length: definition.limits.min }, () =>
-        blankValue(definition.item),
-      );
-    case 'object':
-      return Object.fromEntries(
-        Object.entries(definition.shape).map(([key, value]) => [
-          key,
-          blankValue(value),
-        ]),
-      );
-  }
-}
-
-/** Whether two content values are the same. */
-export function equal(a: unknown, b: unknown): boolean {
-  if (a === b) return true;
-  if (Array.isArray(a)) {
-    return (
-      Array.isArray(b) &&
-      a.length === b.length &&
-      a.every((each, index) => equal(each, b[index]))
-    );
-  }
-  if (
-    typeof a !== 'object' ||
-    typeof b !== 'object' ||
-    a === null ||
-    b === null ||
-    Array.isArray(b)
-  ) {
-    return false;
-  }
-  const keys = Object.keys(a);
-  return (
-    keys.length === Object.keys(b).length &&
-    keys.every(
-      (key) =>
-        Object.hasOwn(b, key) &&
-        equal(
-          (a as Record<string, unknown>)[key],
-          (b as Record<string, unknown>)[key],
-        ),
-    )
-  );
+export function newItemValue(definition: Definition): ContentValue {
+  return blankValue(definition, () => '');
 }

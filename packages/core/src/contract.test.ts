@@ -2,12 +2,15 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { Ajv2020, type AnySchemaObject } from 'ajv/dist/2020.js';
 import { describe, expect, test } from 'vitest';
 import {
+  decimalPlaces,
   defineFields,
+  definitionOf,
   graphemeCount,
   list,
   number,
   text,
   toJSONSchema,
+  violations,
   type JSONSchema,
 } from '@edity/core';
 
@@ -51,16 +54,8 @@ function edityValidator(): Ajv2020 {
   ajv.addKeyword({
     keyword: 'x-edity-decimals',
     schemaType: 'number',
-    compile: (decimals: number) => {
-      // A number Field allows any finite number with this many decimals.
-      const field = number({
-        min: -Number.MAX_VALUE,
-        max: Number.MAX_VALUE,
-        decimals,
-      });
-      return (data: unknown) =>
-        typeof data !== 'number' || field.safeParse(data).success;
-    },
+    validate: (decimals: number, data: unknown) =>
+      typeof data !== 'number' || decimalPlaces(data) <= decimals,
   });
   // Annotations: the Editor measures rendered lines.
   ajv.addKeyword({ keyword: 'x-edity-maxLines', schemaType: 'number' });
@@ -85,9 +80,10 @@ describe.each(fixtures('keywords'))('keywords/%s', (_, cases) => {
 });
 
 // A page fixture holds a page's JSON Schema as core generates it. Core's own
-// verdict on a Draft comes from the Field definitions, which the Site build
-// validates with, so each Draft goes through those and through the JSON
-// Schema, which the save service validates with. They must agree.
+// verdicts on a Draft come from the Field definitions, which the Site build
+// validates with, and from `violations`, which the Editor checks with, so each
+// Draft goes through those and through the JSON Schema, which the save
+// service validates with. They must agree.
 describe.each(fixtures('pages'))('pages/%s', (_, cases) => {
   describe.each(cases)('$description', ({ schema, tests }) => {
     const fields = fieldDefinitionsOf(schema);
@@ -99,10 +95,15 @@ describe.each(fixtures('pages'))('pages/%s', (_, cases) => {
     test.each(tests)('$description', ({ data, valid }) => {
       const verdicts = {
         fieldDefinitions: fields.safeParse(data).success,
+        violations: violations(definitionOf(fields)!, data).length === 0,
         jsonSchema: ajv.compile(schema)(data),
       };
 
-      expect(verdicts).toEqual({ fieldDefinitions: valid, jsonSchema: valid });
+      expect(verdicts).toEqual({
+        fieldDefinitions: valid,
+        violations: valid,
+        jsonSchema: valid,
+      });
     });
   });
 });

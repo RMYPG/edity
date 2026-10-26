@@ -68,12 +68,12 @@ describe('toJSONSchema', () => {
 
   test('a number Field with no decimals is an integer', () => {
     const home = defineFields({
-      sessions: number({ min: -5, max: 20, decimals: 0 }),
+      sessions: number({ min: 1, max: 20, decimals: 0 }),
     });
 
     expect(fieldsOf(home).sessions).toEqual({
       type: 'integer',
-      minimum: -5,
+      minimum: 1,
       maximum: 20,
     });
   });

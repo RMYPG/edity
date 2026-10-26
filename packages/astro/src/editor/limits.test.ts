@@ -1,11 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import {
-  isChanged,
-  lineLimit,
-  limitCounts,
-  standing,
-  type Count,
-} from './limits.js';
+import { lineLimit, limitCounts, standing, type Count } from './limits.js';
 
 const call = { kind: 'text', limits: { maxChars: 10, maxLines: 1 } } as const;
 const title = {
@@ -29,16 +23,16 @@ describe('characters (L1, L4)', () => {
     expect(text.length).toBe(27);
 
     expect(limitCounts(call, text)).toEqual([
-      { limit: 'chars', count: 10, max: 10 },
+      { limit: 'chars', used: 10, max: 10 },
     ]);
     expect(limitCounts(call, `${text}!`)).toEqual([
-      { limit: 'chars', count: 11, max: 10 },
+      { limit: 'chars', used: 11, max: 10 },
     ]);
   });
 
   test('show from 80% of the Limit on', () => {
     expect(limitCounts(call, 'Llámanos')).toEqual([
-      { limit: 'chars', count: 8, max: 10 },
+      { limit: 'chars', used: 8, max: 10 },
     ]);
     expect(limitCounts(call, 'Llámalos')).toHaveLength(1);
     expect(limitCounts(call, 'Llámame')).toEqual([]);
@@ -52,7 +46,7 @@ describe('lines (L2)', () => {
     const text = '\u00f1n\u0303👨‍👩‍👧‍👦🇪🇸👍🏽 años';
     expect(limitCounts(title, text, { lines: 2, narrow: false })).toEqual([]);
     expect(limitCounts(title, text, { lines: 3, narrow: false })).toEqual([
-      { limit: 'lines', count: 3, max: 2 },
+      { limit: 'lines', used: 3, max: 2 },
     ]);
     expect(limitCounts(call, 'Hola', { lines: 1, narrow: false })).toEqual([]);
   });
@@ -60,7 +54,7 @@ describe('lines (L2)', () => {
   test('take the narrow value on a narrow screen', () => {
     expect(limitCounts(title, 'Hola', { lines: 3, narrow: true })).toEqual([]);
     expect(limitCounts(title, 'Hola', { lines: 4, narrow: true })).toEqual([
-      { limit: 'lines', count: 4, max: 3 },
+      { limit: 'lines', used: 4, max: 3 },
     ]);
   });
 
@@ -76,8 +70,8 @@ describe('lines (L2)', () => {
     expect(
       limitCounts(title, 'x'.repeat(50), { lines: 3, narrow: false }),
     ).toEqual([
-      { limit: 'lines', count: 3, max: 2 },
-      { limit: 'chars', count: 50, max: 60 },
+      { limit: 'lines', used: 3, max: 2 },
+      { limit: 'chars', used: 50, max: 60 },
     ]);
   });
 });
@@ -117,8 +111,8 @@ describe('numbers (L5)', () => {
 });
 
 describe('standing (L3, L7)', () => {
-  const over: Count = { limit: 'chars', count: 11, max: 10 };
-  const near: Count = { limit: 'chars', count: 9, max: 10 };
+  const over: Count = { limit: 'chars', used: 11, max: 10 };
+  const near: Count = { limit: 'chars', used: 9, max: 10 };
 
   test('a Field over a Limit is red only when the Draft changed it', () => {
     expect(standing([over], true)).toBe('over');
@@ -130,72 +124,5 @@ describe('standing (L3, L7)', () => {
     expect(standing([near], true)).toBe('near');
     expect(standing([near], false)).toBe('near');
     expect(standing([], true)).toBe('within');
-  });
-
-  describe('isChanged (L7)', () => {
-    const content = {
-      hero: { title: 'Fisioterapia', lead: 'Una hora' },
-      services: ['Suelo pélvico', 'Punción seca', 'Masaje'],
-      plans: [
-        { name: 'Básico', features: ['Una sesión'] },
-        { name: 'Completo', features: ['Cuatro', 'Plan'] },
-      ],
-    };
-
-    test('a Field with a Change changed, and one without did not', () => {
-      const changes = [
-        { path: 'hero.title', before: 'Fisioterapia', after: 'Fisio' },
-        { path: 'services.1', before: 'Punción seca', after: 'Punción' },
-      ];
-
-      expect(isChanged('hero.title', changes, content)).toBe(true);
-      expect(isChanged('services.1', changes, content)).toBe(true);
-      expect(isChanged('hero.lead', changes, content)).toBe(false);
-      expect(isChanged('hero.titles', changes, content)).toBe(false);
-      expect(isChanged('services.0', changes, content)).toBe(false);
-    });
-
-    test('in a List whose structure changed, new and edited Items changed, and built ones that only moved did not (S7)', () => {
-      const changes = [
-        {
-          path: 'services',
-          before: content.services,
-          after: ['Masaje', 'Suelo pélvico', 'Punción', 'Pilates'],
-        },
-        {
-          path: 'plans',
-          before: content.plans,
-          after: [
-            { name: 'Completo', features: ['Cuatro', 'Plan'] },
-            { name: 'Básico', features: ['Una sesión', 'Correo'] },
-          ],
-        },
-      ];
-
-      expect(isChanged('services.0', changes, content)).toBe(false);
-      expect(isChanged('services.1', changes, content)).toBe(false);
-      expect(isChanged('services.2', changes, content)).toBe(true);
-      expect(isChanged('services.3', changes, content)).toBe(true);
-      expect(isChanged('plans.0.name', changes, content)).toBe(false);
-      expect(isChanged('plans.0.features.1', changes, content)).toBe(false);
-      // The card whose List gained an Item.
-      expect(isChanged('plans.1.name', changes, content)).toBe(true);
-      expect(isChanged('plans.1.features.0', changes, content)).toBe(true);
-      expect(isChanged('plansx.0', changes, content)).toBe(false);
-    });
-
-    test('so does a List inside an Item, while the outer List is as built', () => {
-      const changes = [
-        {
-          path: 'plans.1.features',
-          before: content.plans[1]!.features,
-          after: ['Plan', 'Cuatro', 'Seguimiento'],
-        },
-      ];
-
-      expect(isChanged('plans.1.features.0', changes, content)).toBe(false);
-      expect(isChanged('plans.1.features.2', changes, content)).toBe(true);
-      expect(isChanged('plans.1.name', changes, content)).toBe(false);
-    });
   });
 });

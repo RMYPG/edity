@@ -6,6 +6,8 @@ import {
   type ObjectDefinition,
 } from '@edity/core';
 import type * as z from 'zod/v4';
+import { blankValue, markup } from './markup.js';
+import { childPath, keysOf, pathOf } from './paths.js';
 
 /**
  * The value of a `data-edity-*` attribute: `<h1
@@ -94,8 +96,8 @@ interface ItemBase<I> {
   readonly path: Marker;
   /**
    * The Item's content. In the List's `<template>` it is blank: text Fields
-   * are empty, number Fields are 0 or the Limit nearest to it, and Lists hold
-   * their minimum number of blank Items.
+   * are empty, number Fields hold their minimum, and Lists hold their
+   * minimum number of blank Items.
    */
   readonly value: I;
   /** The Item's position in its List. */
@@ -230,12 +232,12 @@ function walk(
   data: unknown,
   path: string,
 ): [Definition | undefined, unknown] {
-  const keys = path.split('.');
+  const keys = keysOf(path);
   let definition: Definition | undefined = root;
   let value = data;
   for (const [index, key] of keys.entries()) {
     if (definition?.kind === 'list') {
-      const list = keys.slice(0, index).join('.');
+      const list = pathOf(keys.slice(0, index));
       throw new Error(
         `[edity] "${path}" is inside the List "${list}" in page "${page.name}": mark it through its Item, with item.field() or item.list() in <Items>`,
       );
@@ -289,11 +291,11 @@ function list(
         page,
         path,
         definition,
-        blankValue(definition.item),
+        blankValue(definition.item, ({ min }) => min),
         values.length,
       );
       const blankHtml = rooted(page, await renderItem(blank), blank);
-      return `${html}<template data-edity-template="${escape(path)}">${blankHtml}</template>`;
+      return `${html}<template ${markup.template}="${escape(path)}">${blankHtml}</template>`;
     },
   };
 }
@@ -305,7 +307,7 @@ function item(
   value: unknown,
   index: number,
 ): AnyItem {
-  const path = `${listPath}.${index}`;
+  const path = childPath(listPath, index);
   const shape = definition.item;
   return {
     path: page.enabled ? path : undefined,
@@ -314,12 +316,12 @@ function item(
     field(key) {
       return shape.kind === 'text'
         ? field(page, path, shape)
-        : field(page, `${path}.${key}`, shapeAt(shape, key));
+        : field(page, childPath(path, String(key)), shapeAt(shape, key));
     },
     list(key) {
       return list(
         page,
-        `${path}.${key}`,
+        childPath(path, key),
         shape.kind === 'object' ? shapeAt(shape, key) : undefined,
         (value as Record<string, unknown>)[key],
       );
@@ -347,36 +349,12 @@ const startTag =
 function rooted(page: Page, html: string, item: AnyItem): string {
   if (item.path === undefined) return html;
   const start = startTag.exec(html)?.[0] ?? '';
-  if (!start.includes(` data-edity-item="${escape(item.path)}"`)) {
+  if (!start.includes(` ${markup.item}="${escape(item.path)}"`)) {
     throw new Error(
       `[edity] The Item "${item.path}" in page "${page.name}" must start with its root element, marked with data-edity-item={item.path}`,
     );
   }
   return html;
-}
-
-/** A blank Item: what a new Item holds until the Client fills it in. */
-function blankValue(definition: Definition): unknown {
-  switch (definition.kind) {
-    case 'text':
-      return '';
-    case 'number':
-      return Math.min(
-        Math.max(0, definition.limits.min),
-        definition.limits.max,
-      );
-    case 'list':
-      return Array.from({ length: definition.limits.min }, () =>
-        blankValue(definition.item),
-      );
-    case 'object':
-      return Object.fromEntries(
-        Object.entries(definition.shape).map(([key, value]) => [
-          key,
-          blankValue(value),
-        ]),
-      );
-  }
 }
 
 /** Escapes an attribute value the way Astro does. */

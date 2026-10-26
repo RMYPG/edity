@@ -7,15 +7,14 @@
 import { effect, untracked, type Signal } from '@preact/signals';
 import { render } from 'preact';
 import { useLayoutEffect, useRef } from 'preact/hooks';
+import { markup } from '../markup.js';
 import { Counters } from './Counters.js';
 import { editorRoot, readPage } from './documents.js';
 import type { Change } from './draft.js';
-import type { Fields } from './fields.js';
 import type { Messages } from './i18n.js';
-import type { Lists } from './lists.js';
+import { adoptSheet } from './sheets.js';
 import { draftDelta, showDraft } from './show-draft.js';
-import type { EditorState } from './state.js';
-import type { Limits } from './watch-limits.js';
+import type { Editing } from './state.js';
 
 /** What the preview's frame sends its element once its page is parsed. */
 export const previewReady = 'edity-preview-ready';
@@ -50,14 +49,11 @@ export function PreviewToggle({ open, t }: ToggleProps) {
 interface Props {
   /** Whether the preview shows: it closes on a phone's width. */
   readonly open: Signal<boolean>;
-  readonly state: EditorState;
-  readonly fields: Fields;
-  readonly lists: Lists;
-  readonly limits: Limits;
+  readonly editing: Editing;
 }
 
 /** The preview: the page as a phone shows it, with the Draft. */
-export function Preview({ state, fields, lists, limits, open }: Props) {
+export function Preview({ editing, open }: Props) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   // A layout effect runs before the frame can load, so no event is missed.
   useLayoutEffect(() => {
@@ -67,7 +63,7 @@ export function Preview({ state, fields, lists, limits, open }: Props) {
     };
     close();
     phone.addEventListener('change', close);
-    const stop = showIn(frame.current!, state, fields, lists, limits);
+    const stop = showIn(frame.current!, editing);
     return () => {
       phone.removeEventListener('change', close);
       stop();
@@ -77,9 +73,9 @@ export function Preview({ state, fields, lists, limits, open }: Props) {
     <div class="preview">
       <iframe
         ref={frame}
-        data-edity-preview=""
+        {...{ [markup.preview]: '' }}
         src={location.pathname + location.search}
-        title={state.t.phonePreview}
+        title={editing.state.t.phonePreview}
       />
     </div>
   );
@@ -89,13 +85,7 @@ export function Preview({ state, fields, lists, limits, open }: Props) {
  * Shows the Draft in each page `frame` loads, from when it is parsed or, if
  * this bundle does not run there, loaded. Returns a function that stops.
  */
-function showIn(
-  frame: HTMLIFrameElement,
-  state: EditorState,
-  fields: Fields,
-  lists: Lists,
-  limits: Limits,
-): () => void {
+function showIn(frame: HTMLIFrameElement, editing: Editing): () => void {
   let shown: { readonly document: Document; stop(): void } | undefined;
   const loaded = () => {
     const document = frame.contentDocument;
@@ -110,7 +100,7 @@ function showIn(
     shown?.stop();
     shown = {
       document,
-      stop: showPage(document, state, fields, lists, limits),
+      stop: showPage(document, editing),
     };
   };
   frame.addEventListener(previewReady, loaded);
@@ -128,20 +118,15 @@ function showIn(
  * checks the Limits of its Fields there, with counters. Returns a function
  * that stops.
  */
-function showPage(
-  document: Document,
-  { draft, page, locale, t }: EditorState,
-  fields: Fields,
-  lists: Lists,
-  limits: Limits,
-): () => void {
+function showPage(document: Document, editing: Editing): () => void {
+  const { state, limits } = editing;
+  const { draft, page, locale, t } = state;
   // A desktop's scroll bar would take some 15 px of the 390, and a phone's
   // takes none.
-  const sheet = new document.defaultView!.CSSStyleSheet();
-  sheet.replaceSync(
+  adoptSheet(
+    document,
     'html { scrollbar-width: none } html::-webkit-scrollbar { display: none }',
   );
-  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
   // A link in the frame can lead to another page, which shows as published:
   // the Draft is this page's.
   if (page === undefined || readPage(document)?.page !== page.page) {
@@ -152,12 +137,7 @@ function showPage(
   const stopShowing = effect(() => {
     const changes = draft.changes.value;
     untracked(() =>
-      showDraft(
-        fields,
-        lists,
-        draftDelta(showing, changes, page.content),
-        document,
-      ),
+      showDraft(editing, draftDelta(showing, changes, page.content), document),
     );
     showing = changes;
   });

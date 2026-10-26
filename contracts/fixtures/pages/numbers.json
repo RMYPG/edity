@@ -19,7 +19,7 @@
           "type": "number",
           "x-edity-decimals": 1
         },
-        "sessions": { "maximum": 20, "minimum": -5, "type": "integer" }
+        "sessions": { "maximum": 20, "minimum": 1, "type": "integer" }
       },
       "required": ["price", "sessions", "rating"],
       "type": "object"
@@ -32,7 +32,7 @@
       },
       {
         "description": "every Field at min",
-        "data": { "price": 0, "sessions": -5, "rating": 0.5 },
+        "data": { "price": 0, "sessions": 1, "rating": 0.5 },
         "valid": true
       },
       {
@@ -51,8 +51,8 @@
         "valid": false
       },
       {
-        "description": "sessions below a negative min",
-        "data": { "price": 19.99, "sessions": -6, "rating": 4.5 },
+        "description": "sessions below a whole min",
+        "data": { "price": 19.99, "sessions": 0, "rating": 4.5 },
         "valid": false
       },
       {

@@ -15,11 +15,12 @@ import {
   type ReadonlySignal,
 } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
-import { fieldAt, valueAt } from './content.js';
+import { markedPath, markup, selector } from '../markup.js';
+import { fieldAt } from './content.js';
 import type { ContentValue } from './draft.js';
+import { whileEditing } from './edit-view.js';
 import type { Fields } from './fields.js';
 import {
-  isChanged,
   limitCounts,
   lineLimit,
   standing,
@@ -28,10 +29,11 @@ import {
 } from './limits.js';
 import css from './limits.css?inline';
 import { blockOf, countLines, textBox } from './lines.js';
+import { adoptSheet } from './sheets.js';
 import type { EditorState } from './state.js';
 import { fieldValue, type FieldDefinition } from './values.js';
 
-const field = '[data-edity-field]';
+const field = selector(markup.field);
 
 /** A Field element whose counter shows. */
 export interface LimitMark {
@@ -129,15 +131,11 @@ function watchPage(
     untracked(scheduleAll);
   });
   // The visitor view (P7) leaves every Field as the Site built it.
-  effect(() => {
-    if (state.view.value !== 'edit') return;
-    untracked(() => {
-      for (const watcher of watchers.values()) watcher.start();
-    });
-    return () =>
-      untracked(() => {
-        for (const watcher of watchers.values()) watcher.stop();
-      });
+  whileEditing(state.view, () => {
+    for (const watcher of watchers.values()) watcher.start();
+    return () => {
+      for (const watcher of watchers.values()) watcher.stop();
+    };
   });
   watch(document);
 
@@ -161,7 +159,7 @@ function watchDocument(
         readonly narrow: MediaQueryList;
         readonly resizes: ResizeObserver;
         readonly observed: WeakSet<Element>;
-        readonly sheet: CSSStyleSheet;
+        readonly removeSheet: () => void;
         readonly listening: AbortController;
         frame: number | undefined;
       }
@@ -172,10 +170,7 @@ function watchDocument(
     if (running !== undefined || window === null) return;
     const listening = new AbortController();
     const options = { signal: listening.signal, passive: true };
-    // From the document's own window, which a frame's elements need.
-    const sheet = new window.CSSStyleSheet();
-    sheet.replaceSync(css);
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    const removeSheet = adoptSheet(document, css);
     const narrow = window.matchMedia(page.narrowScreens);
     // Lines change with the width, and when a font arrives. Safari fires no
     // `loadingdone` and can resolve `fonts.ready` early, but a font that
@@ -186,7 +181,7 @@ function watchDocument(
       narrow,
       resizes,
       observed: new WeakSet(),
-      sheet,
+      removeSheet,
       listening,
       frame: undefined,
     };
@@ -214,15 +209,13 @@ function watchDocument(
 
   function stop(): void {
     if (running === undefined) return;
-    const { window, resizes, sheet, listening, frame } = running;
+    const { window, resizes, removeSheet, listening, frame } = running;
     running = undefined;
     listening.abort();
     resizes.disconnect();
     if (frame !== undefined) window.cancelAnimationFrame(frame);
     for (const element of [...marked.keys()]) look(element, 'within');
-    document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
-      (each) => each !== sheet,
-    );
+    removeSheet();
     marks = [];
     update(false);
   }
@@ -237,12 +230,11 @@ function watchDocument(
     running.frame = undefined;
     const { window, resizes, observed } = running;
     const narrow = running.narrow.matches;
-    const changes = [...draft.changes.peek().values()];
     const focused = document.activeElement?.closest(field);
     const next: LimitMark[] = [];
     const seen = new Set<HTMLElement>();
     for (const element of document.querySelectorAll<HTMLElement>(field)) {
-      const path = element.dataset.edityField ?? '';
+      const path = markedPath(element, markup.field);
       const definition = fieldAt(page.fields, path);
       if (definition === undefined) continue;
       let block = blocks.get(element);
@@ -264,7 +256,7 @@ function watchDocument(
           ? { lines: countLines(element), narrow }
           : undefined,
       );
-      const stands = standing(counts, isChanged(path, changes, page.content));
+      const stands = standing(counts, draft.isChanged(path, page.content));
       look(element, stands);
       seen.add(element);
       if (stands === 'within' || (stands === 'near' && element !== focused)) {
@@ -298,13 +290,7 @@ function watchDocument(
     }
     // A number Field's shows it as the template formats it, so its value is
     // the Draft's, or the built one.
-    for (const change of draft.changes.peek().values()) {
-      if (change.path === path) return change.after;
-      if (path.startsWith(`${change.path}.`)) {
-        return valueAt(change.after, path.slice(change.path.length + 1));
-      }
-    }
-    return valueAt(page.content, path);
+    return draft.valueAt(path, page.content);
   }
 
   /** Gives a Field element the look of its standing: red, warned or none. */
@@ -313,7 +299,7 @@ function watchDocument(
       stands === 'over' || stands === 'warning' ? stands : undefined;
     if (limit === undefined) {
       if (!marked.has(element)) return;
-      element.removeAttribute('data-edity-limit');
+      element.removeAttribute(markup.limit);
       restore(element, 'aria-invalid', marked.get(element)!);
       marked.delete(element);
       return;
@@ -321,8 +307,8 @@ function watchDocument(
     if (!marked.has(element)) {
       marked.set(element, element.getAttribute('aria-invalid'));
     }
-    if (element.getAttribute('data-edity-limit') !== limit) {
-      element.setAttribute('data-edity-limit', limit);
+    if (element.getAttribute(markup.limit) !== limit) {
+      element.setAttribute(markup.limit, limit);
     }
     // Screen readers say a red Field is invalid.
     if (limit === 'over') element.setAttribute('aria-invalid', 'true');

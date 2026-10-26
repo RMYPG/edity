@@ -1,9 +1,12 @@
 // A Field's value against its Limits (L1 to L5, L7), apart from the DOM:
 // what its counter shows, and whether it blocks Publish.
-import { graphemeCount, type NumberLimits, type TextLimits } from '@edity/core';
-import { valueAt } from './content.js';
-import type { Change, ContentValue } from './draft.js';
-import { originsOf } from './list-changes.js';
+import {
+  graphemeCount,
+  violations,
+  type NumberDefinition,
+  type TextLimits,
+} from '@edity/core';
+import type { ContentValue } from './draft.js';
 import { numberValue, type FieldDefinition } from './values.js';
 
 /**
@@ -18,7 +21,8 @@ import { numberValue, type FieldDefinition } from './values.js';
 export type Count =
   | {
       readonly limit: 'chars' | 'lines';
-      readonly count: number;
+      /** The visible characters or lines the value takes. */
+      readonly used: number;
       readonly max: number;
     }
   | { readonly limit: 'min' | 'max'; readonly bound: number }
@@ -27,7 +31,7 @@ export type Count =
 /** Whether `count` is over its Limit, rather than near it. */
 export function isOver(count: Count): boolean {
   return count.limit === 'chars' || count.limit === 'lines'
-    ? count.count > count.max
+    ? count.used > count.max
     : true;
 }
 
@@ -58,7 +62,7 @@ export function limitCounts(
   const counts: Count[] =
     definition.kind === 'text'
       ? textCounts(definition.limits, String(value), rendered)
-      : numberCounts(definition.limits, value);
+      : numberCounts(definition, value);
   return [...counts.filter(isOver), ...counts.filter((each) => !isOver(each))];
 }
 
@@ -70,32 +74,43 @@ function textCounts(
   const counts: Count[] = [];
   const chars = graphemeCount(value);
   if (chars * 5 >= limits.maxChars * 4) {
-    counts.push({ limit: 'chars', count: chars, max: limits.maxChars });
+    counts.push({ limit: 'chars', used: chars, max: limits.maxChars });
   }
   if (rendered !== undefined) {
     const max = lineLimit(limits, rendered.narrow);
     if (max !== undefined && rendered.lines > max) {
-      counts.push({ limit: 'lines', count: rendered.lines, max });
+      counts.push({ limit: 'lines', used: rendered.lines, max });
     }
   }
   return counts;
 }
 
-function numberCounts(limits: NumberLimits, value: ContentValue): Count[] {
-  let number: number | undefined;
-  let decimals = false;
-  if (typeof value === 'number') {
-    number = value;
-    decimals = !hasAtMost(value, limits.decimals);
-  } else if (typeof value === 'string') {
-    number = numberValue(value, Infinity);
-    decimals = number !== undefined;
+function numberCounts(
+  definition: NumberDefinition,
+  value: ContentValue,
+): Count[] {
+  // The Draft holds text when the Client typed no number with at most the
+  // Field's decimals (E5): one with more, which breaks that Limit whatever
+  // the digits are, or none at all, which breaks none.
+  const typed = typeof value === 'string';
+  const number = typed ? numberValue(value, Infinity) : value;
+  if (typeof number !== 'number') return [];
+  const counts = violations(definition, number).flatMap(
+    (violation): Count[] => {
+      switch (violation.rule) {
+        case 'min':
+        case 'max':
+          return [{ limit: violation.rule, bound: violation.bound }];
+        case 'decimals':
+          return [{ limit: 'decimals', max: violation.max }];
+        default:
+          return [];
+      }
+    },
+  );
+  if (typed && !counts.some((count) => count.limit === 'decimals')) {
+    counts.push({ limit: 'decimals', max: definition.limits.decimals });
   }
-  if (number === undefined) return [];
-  const counts: Count[] = [];
-  if (number < limits.min) counts.push({ limit: 'min', bound: limits.min });
-  if (number > limits.max) counts.push({ limit: 'max', bound: limits.max });
-  if (decimals) counts.push({ limit: 'decimals', max: limits.decimals });
   return counts;
 }
 
@@ -108,12 +123,6 @@ export function lineLimit(
   narrow: boolean,
 ): number | undefined {
   return narrow ? (limits.maxLinesNarrow ?? limits.maxLines) : limits.maxLines;
-}
-
-/** Whether `value` has at most `decimals` digits after the point. */
-function hasAtMost(value: number, decimals: number): boolean {
-  // The shortest decimal form, as @edity/core checks it.
-  return Number(value.toFixed(Math.min(decimals, 100))) === value;
 }
 
 /**
@@ -133,29 +142,4 @@ export type Standing = 'within' | 'near' | 'warning' | 'over';
 export function standing(counts: readonly Count[], changed: boolean): Standing {
   if (counts.some(isOver)) return changed ? 'over' : 'warning';
   return counts.length > 0 ? 'near' : 'within';
-}
-
-/**
- * Whether the Field at `path` changed in a Draft holding `changes`, on a page
- * built from `content`: it has a Change, or it is in a List whose structure
- * changed (S7), in an Item that is not one of the List's built Items. A
- * built Item that only moved shows what was published.
- *
- * Items are matched by value, as a List shown from a Draft gets its Items
- * back (`originsOf`), so the phone preview tells the same as the page.
- */
-export function isChanged(
-  path: string,
-  changes: Iterable<Change>,
-  content: unknown,
-): boolean {
-  for (const change of changes) {
-    if (path === change.path) return true;
-    if (!path.startsWith(`${change.path}.`)) continue;
-    const built = valueAt(content, change.path);
-    if (!Array.isArray(change.after) || !Array.isArray(built)) return true;
-    const [index = ''] = path.slice(change.path.length + 1).split('.');
-    return originsOf(built, change.after)[Number(index)] === undefined;
-  }
-  return false;
 }

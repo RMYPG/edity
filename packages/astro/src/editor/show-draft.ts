@@ -3,10 +3,10 @@
 // document's elements, so restoring a Draft kept in the browser (P2),
 // Discard and the preview show it alike.
 import { batch } from '@preact/signals';
-import { valueAt } from './content.js';
-import type { Change, ContentValue, Draft } from './draft.js';
-import type { Fields } from './fields.js';
-import type { Lists } from './lists.js';
+import { markup, selector } from '../markup.js';
+import { sameValue, valueAt } from './content.js';
+import type { Change } from './draft.js';
+import type { Editing } from './state.js';
 
 /**
  * Shows each Change's `after` in `root`, in order: a List Change as the
@@ -17,8 +17,7 @@ import type { Lists } from './lists.js';
  * one to a Field the Site no longer has.
  */
 export function showDraft(
-  fields: Fields,
-  lists: Lists,
+  { fields, lists }: Pick<Editing, 'fields' | 'lists'>,
   changes: Iterable<Change>,
   root: ParentNode = document,
 ): Change[] {
@@ -41,14 +40,14 @@ export function showDraft(
 
 /** Whether `root` shows the List or the Field a Change is to. */
 function shows(root: ParentNode, { path, after }: Change): boolean {
-  const kind = Array.isArray(after)
-    ? 'list'
+  const attribute = Array.isArray(after)
+    ? markup.list
     : typeof after === 'object'
       ? undefined
-      : 'field';
+      : markup.field;
   return (
-    kind !== undefined &&
-    root.querySelector(`[data-edity-${kind}="${CSS.escape(path)}"]`) !== null
+    attribute !== undefined &&
+    root.querySelector(selector(attribute, path)) !== null
   );
 }
 
@@ -56,12 +55,9 @@ function shows(root: ParentNode, { path, after }: Change): boolean {
  * Shows a Draft restored from the browser on the page (P2), and drops the
  * Changes to Fields and Lists it no longer has. Returns how many it dropped.
  */
-export function restoreDraft(
-  draft: Draft,
-  fields: Fields,
-  lists: Lists,
-): number {
-  const missing = showDraft(fields, lists, draft.changes.peek().values());
+export function restoreDraft(editing: Editing): number {
+  const { draft } = editing.state;
+  const missing = showDraft(editing, draft.changes.peek().values());
   batch(() => {
     for (const { path } of missing) draft.remove(path);
   });
@@ -98,8 +94,4 @@ export function draftDelta(
  */
 export function asBuilt(change: Change, content: unknown): Change {
   return { ...change, after: valueAt(content, change.path) ?? change.before };
-}
-
-function sameValue(a: ContentValue, b: ContentValue): boolean {
-  return a === b || JSON.stringify(a) === JSON.stringify(b);
 }

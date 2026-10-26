@@ -36,7 +36,7 @@ function memory(): KeptStorage & { readonly items: Map<string, string> } {
 describe('draftStore', () => {
   test('keeps the Changes of a page, in order, and gives them back after a reload (P2)', () => {
     const storage = memory();
-    draftStore('fixture', 'home', () => storage).save([
+    draftStore('fixture', 'home', () => storage).keep([
       title,
       services,
       price,
@@ -52,7 +52,7 @@ describe('draftStore', () => {
   test("keeps them under a key for the Site and the page, apart from other Sites' and pages'", () => {
     const storage = memory();
 
-    draftStore('fixture', 'home', () => storage).save([title]);
+    draftStore('fixture', 'home', () => storage).keep([title]);
 
     expect([...storage.items.keys()]).toEqual(['edity:draft:v1:fixture:home']);
     expect(draftStore('fixture', 'about', () => storage).load()).toEqual([]);
@@ -62,9 +62,9 @@ describe('draftStore', () => {
   test('forgets the Draft once it holds no Changes, as after Discard', () => {
     const storage = memory();
     const store = draftStore('fixture', 'home', () => storage);
-    store.save([title]);
+    store.keep([title]);
 
-    store.save([]);
+    store.keep([]);
 
     expect(storage.items.size).toBe(0);
     expect(store.load()).toEqual([]);
@@ -130,8 +130,8 @@ describe('draftStore', () => {
       draftStore('fixture', 'home', () => full),
     ]) {
       expect(store.load()).toEqual([]);
-      expect(() => store.save([title])).not.toThrow();
-      expect(() => store.save([])).not.toThrow();
+      expect(() => store.keep([title])).not.toThrow();
+      expect(() => store.keep([])).not.toThrow();
     }
   });
 });
@@ -141,7 +141,7 @@ describe('keepDraft', () => {
     const storage = memory();
     const store = draftStore('fixture', 'home', () => storage);
     // Restored with a Change the page no longer has, now dropped.
-    store.save([title, price]);
+    store.keep([title, price]);
     const draft = new Draft([title]);
 
     const stop = keepDraft(draft, store);

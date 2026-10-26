@@ -7,7 +7,15 @@ import {
   type Locator,
   type Page,
 } from '@playwright/test';
-import { ana, expect, test } from './editor.js';
+import {
+  ana,
+  caretAtEnd,
+  expect,
+  field,
+  focusField,
+  test,
+  texts,
+} from './editor.js';
 
 /** The fixture page's Lists as built, as `src/content/home.json` holds them. */
 const built = {
@@ -26,31 +34,9 @@ const built = {
   ],
 } as const;
 
-/** The Site's elements that show the Field at `path`. */
-function field(page: Page, path: string): Locator {
-  return page.locator(`[data-edity-field="${path}"]`);
-}
-
 /** The Site's Item element at `path`. */
 function item(page: Page, path: string): Locator {
   return page.locator(`[data-edity-item="${path}"]`);
-}
-
-/** The text of the first Field of each Item of the List at `path`. */
-function texts(page: Page, path: string): Promise<string[]> {
-  return page
-    .locator(`[data-edity-list="${path}"]`)
-    .evaluate((list) =>
-      [...list.children]
-        .filter((child) => child.hasAttribute('data-edity-item'))
-        .map(
-          (child) =>
-            (child.matches('[data-edity-field]')
-              ? child
-              : child.querySelector('[data-edity-field]')
-            )?.textContent ?? '',
-        ),
-    );
 }
 
 /** The List element at `path`. */
@@ -123,30 +109,6 @@ function strayPaths(page: Page, path: string): Promise<string[]> {
       check(item, `${item.getAttribute('data-edity-item')}`);
     }
     return stray;
-  });
-}
-
-/**
- * Clicks into the Field at `path`, so its Item's controls show. It clicks
- * near the text's start: the controls of the Item below, which sit above
- * that Item's end, can cover this one's on a phone.
- */
-async function focusField(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  const box = (await locator.boundingBox())!;
-  await locator.click({ position: { x: 4, y: box.height / 2 } });
-  await expect(locator).toBeFocused();
-  return locator;
-}
-
-/** Puts the caret at the end of the focused Field's text. */
-async function caretAtEnd(locator: Locator): Promise<void> {
-  await locator.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    range.collapse(false);
-    getSelection()!.removeAllRanges();
-    getSelection()!.addRange(range);
   });
 }
 
@@ -816,7 +778,6 @@ test.describe('Enter and Backspace in simple Lists (S4)', () => {
   test('Backspace in an empty Item removes it, and the caret goes to the end of the one before', async ({
     page,
     openEditor,
-    editor,
   }) => {
     await openEditor();
     await focusField(page, 'services.1');
@@ -832,10 +793,6 @@ test.describe('Enter and Backspace in simple Lists (S4)', () => {
       `${built.services[0]}!`,
       ...built.services.slice(2),
     ]);
-    // Nothing was lost, so there is nothing to undo.
-    await expect(editor.getByRole('button', { name: 'Deshacer' })).toHaveCount(
-      0,
-    );
   });
 
   test('a List inside an Item takes Enter and Backspace too', async ({
@@ -949,6 +906,39 @@ test.describe('Undo (S6)', () => {
       0,
     );
     // The List is as built again, so only the edited Field is a Change.
+    await expect(bar.getByRole('status')).toHaveText('1 cambio');
+  });
+
+  test('removing an empty Item with Backspace offers the same Undo', async ({
+    page,
+    openEditor,
+    editor,
+    bar,
+  }) => {
+    await openEditor();
+    await focusField(page, 'services.1');
+    await page.keyboard.press('ControlOrMeta+A');
+    await page.keyboard.press('Backspace');
+    await page.keyboard.press('Backspace');
+    await expect(item(page, 'services.0')).toBeFocused();
+    expect(await texts(page, 'services')).toEqual([
+      built.services[0],
+      ...built.services.slice(2),
+    ]);
+    // An empty Item is named by its position.
+    await expect(
+      editor.getByRole('status').filter({ hasText: 'quitado' }),
+    ).toHaveText('«elemento 2» quitado' + 'Deshacer');
+
+    await editor.getByRole('button', { name: 'Deshacer' }).click();
+
+    await expect
+      .poll(() => texts(page, 'services'))
+      .toEqual([built.services[0], '', ...built.services.slice(2)]);
+    await expect(editor.getByRole('button', { name: 'Deshacer' })).toHaveCount(
+      0,
+    );
+    // The List is as built again: the emptied Field is the one Change.
     await expect(bar.getByRole('status')).toHaveText('1 cambio');
   });
 

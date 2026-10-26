@@ -12,7 +12,7 @@ import {
   fieldAt,
   fieldChange,
   isWellFormed,
-  pathPattern,
+  sameValue,
   valueAt,
 } from './content.js';
 
@@ -108,11 +108,21 @@ describe('valueAt', () => {
   });
 });
 
-describe('pathPattern', () => {
-  test('stands for the same Field in every Item', () => {
-    expect(pathPattern('plans.1.features.0')).toBe('plans.*.features.*');
-    expect(pathPattern('services.12')).toBe('services.*');
-    expect(pathPattern('hero.title')).toBe('hero.title');
+describe('sameValue', () => {
+  test('compares content values by what they hold, Fields in any order', () => {
+    const plan = { name: 'Básico', price: 19.99, features: ['Una', 'Dos'] };
+    expect(
+      sameValue(plan, {
+        features: ['Una', 'Dos'],
+        price: 19.99,
+        name: 'Básico',
+      }),
+    ).toBe(true);
+    expect(sameValue(plan, { ...plan, features: ['Dos', 'Una'] })).toBe(false);
+    expect(sameValue(plan, { name: 'Básico', price: 19.99 })).toBe(false);
+    expect(sameValue([plan], [{ ...plan }])).toBe(true);
+    expect(sameValue('12', 12)).toBe(false);
+    expect(sameValue(['a'], { 0: 'a' })).toBe(false);
   });
 });
 
@@ -159,11 +169,26 @@ describe('fieldChange', () => {
 });
 
 describe('isWellFormed', () => {
-  test('wants text in a text Field, and not blank', () => {
+  test('wants one visible line of text in a text Field, as @edity/core checks it', () => {
     const title = { path: 'hero.title', before: 'Hola' };
     expect(isWellFormed(fields, { ...title, after: 'Adiós' })).toBe(true);
     expect(isWellFormed(fields, { ...title, after: '' })).toBe(false);
+    expect(isWellFormed(fields, { ...title, after: '\u00a0 ' })).toBe(false);
+    expect(isWellFormed(fields, { ...title, after: 'Uno\nDos' })).toBe(false);
     expect(isWellFormed(fields, { ...title, after: 3 })).toBe(false);
+  });
+
+  test('leaves the Limits of Fields to the counters (L7)', () => {
+    expect(
+      isWellFormed(fields, {
+        path: 'hero.title',
+        before: 'Hola',
+        after: 'x'.repeat(61),
+      }),
+    ).toBe(true);
+    expect(
+      isWellFormed(fields, { path: 'visit.price', before: 35, after: 500.555 }),
+    ).toBe(true);
   });
 
   test('wants a number in a number Field', () => {
@@ -196,6 +221,7 @@ describe('isWellFormed', () => {
       { ...plan, name: '' },
       { ...plan, features: [] },
       { ...plan, features: [''] },
+      { ...plan, notes: 'Más' },
       ['Nuevo'],
     ]) {
       expect(isWellFormed(fields, { ...plans, after: [plan, broken] })).toBe(

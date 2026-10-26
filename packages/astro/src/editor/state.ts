@@ -8,12 +8,15 @@ import type { PageMarker } from '../editable.js';
 import type { Session } from './api.js';
 import { isWellFormed } from './content.js';
 import { Draft, type Change } from './draft.js';
+import type { Fields } from './fields.js';
 import {
   chooseLocale,
   messagesFor,
   type Locale,
   type Messages,
 } from './i18n.js';
+import type { Lists } from './lists.js';
+import type { Limits } from './watch-limits.js';
 
 /**
  * How the Editor shows the page: `edit` with every Editor control, or
@@ -58,6 +61,17 @@ export interface EditorState {
    * changed Field breaks a Limit.
    */
   readonly publishDisabled: ReadonlySignal<boolean>;
+}
+
+/**
+ * The Editor at work on a page: its state, and the page's Fields, Lists and
+ * Limits, as it edits and checks them.
+ */
+export interface Editing {
+  readonly state: EditorState;
+  readonly fields: Fields;
+  readonly lists: Lists;
+  readonly limits: Limits;
 }
 
 export interface EditorStateOptions {

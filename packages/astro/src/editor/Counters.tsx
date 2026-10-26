@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'preact/hooks';
 import css from './counters.css?inline';
 import type { Messages } from './i18n.js';
 import { isOver } from './limits.js';
+import { useSheet } from './sheets.js';
 import type { Limits, LimitMark } from './watch-limits.js';
 
 interface Props {
@@ -20,8 +21,7 @@ interface Props {
  * breaks one.
  */
 export function Counters({ limits, t, of = document }: Props) {
-  const root = useRef<HTMLDivElement | null>(null);
-  useSheet(root, css);
+  const root = useSheet<HTMLDivElement>(css);
   const keyOf = useKeys();
   // Another document's Fields, such as the phone preview's, show their own.
   const marks = limits.marks.value.filter(
@@ -83,22 +83,4 @@ function useKeys(): (element: Element) => number {
     }
     return key;
   };
-}
-
-/** Adopts `css` in the shadow root `ref`'s element is in, while it is. */
-function useSheet(ref: { readonly current: Element | null }, css: string) {
-  useLayoutEffect(() => {
-    const root = ref.current?.getRootNode();
-    // From the window of the document it is in, which may be a frame's.
-    const window = root?.ownerDocument?.defaultView;
-    if (!window || !(root instanceof window.ShadowRoot)) return;
-    const sheet = new window.CSSStyleSheet();
-    sheet.replaceSync(css);
-    root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
-    return () => {
-      root.adoptedStyleSheets = root.adoptedStyleSheets.filter(
-        (each) => each !== sheet,
-      );
-    };
-  }, []);
 }

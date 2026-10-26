@@ -50,4 +50,14 @@ describe('number', () => {
       'decimals must be a whole number of at least 0, got -1',
     );
   });
+
+  test('throws on a negative min, since the Client types no minus sign (E5)', () => {
+    expect(() => number({ min: -5, max: 20, decimals: 0 })).toThrow(
+      'min must be at least 0, got -5: the Editor takes digits and one decimal separator in a number Field, and no minus sign',
+    );
+    expect(definitionOf(number({ min: 0, max: 1, decimals: 0 }))).toEqual({
+      kind: 'number',
+      limits: { min: 0, max: 1, decimals: 0 },
+    });
+  });
 });

@@ -1,5 +1,7 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
-import { valueAt } from './content.js';
+import { isIndex, isWithin, itemIndexIn, keysOf, pathUnder } from '../paths.js';
+import { sameValue, valueAt } from './content.js';
+import { originsOf } from './list-changes.js';
 
 /**
  * A value in a page's content: a Field's text or number, or a List's Items.
@@ -82,8 +84,8 @@ export class Draft {
    * (see `keepBefore`).
    */
   replace(path: string, changes: Iterable<Change>): void {
-    const replaced = [...this.#changes.value.values()].filter(
-      (change) => change.path === path || change.path.startsWith(`${path}.`),
+    const replaced = [...this.#changes.value.values()].filter((change) =>
+      isWithin(change.path, path),
     );
     const next = new Map(
       [...changes].map((change) => [change.path, keepBefore(change, replaced)]),
@@ -91,7 +93,7 @@ export class Draft {
     const kept = new Map<string, Change>();
     let same = true;
     for (const [at, change] of this.#changes.value) {
-      if (at !== path && !at.startsWith(`${path}.`)) {
+      if (!isWithin(at, path)) {
         kept.set(at, change);
         continue;
       }
@@ -109,6 +111,47 @@ export class Draft {
       same = false;
     }
     if (!same) this.#changes.value = kept;
+  }
+
+  /**
+   * The value at `path` on a page built from `content`, with this Draft: the
+   * `after` of its Change at `path`, or the value at `path` in the `after`
+   * of the List Change it is in, else the built one.
+   */
+  valueAt(path: string, content: unknown): ContentValue | undefined {
+    for (const change of this.#changes.value.values()) {
+      if (change.path === path) return change.after;
+      const under = pathUnder(path, change.path);
+      if (under !== undefined) return valueAt(change.after, under);
+    }
+    return valueAt(content, path);
+  }
+
+  /**
+   * Whether this Draft changed the Field at `path`, on a page built from
+   * `content`: it has a Change, or it is in a List whose structure changed
+   * (S7), in an Item that is not one of the List's built Items. A built
+   * Item that only moved shows what was published (L7).
+   *
+   * Items are matched by value, as a List shown from a Draft gets its Items
+   * back (`originsOf`), so the phone preview tells the same as the page.
+   */
+  isChanged(path: string, content: unknown): boolean {
+    for (const change of this.#changes.value.values()) {
+      if (!isWithin(path, change.path)) continue;
+      if (path === change.path) return true;
+      const built = valueAt(content, change.path);
+      const index = itemIndexIn(path, change.path);
+      if (
+        !Array.isArray(change.after) ||
+        !Array.isArray(built) ||
+        index === undefined
+      ) {
+        return true;
+      }
+      return originsOf(built, change.after)[index] === undefined;
+    }
+    return false;
   }
 
   /** Drops every Change, and returns them so the page can be put back. */
@@ -131,12 +174,12 @@ function keepBefore(change: Change, replaced: readonly Change[]): Change {
   if (same !== undefined) return { ...change, before: same.before };
   let before = change.before;
   for (const each of replaced) {
-    if (each.path.startsWith(`${change.path}.`)) {
-      const at = each.path.slice(change.path.length + 1);
-      before = withValueAt(before, at.split('.'), each.before);
-    } else if (change.path.startsWith(`${each.path}.`)) {
-      const at = change.path.slice(each.path.length + 1);
-      before = valueAt(each.before, at) ?? before;
+    const under = pathUnder(each.path, change.path);
+    const above = pathUnder(change.path, each.path);
+    if (under !== undefined) {
+      before = withValueAt(before, keysOf(under), each.before);
+    } else if (above !== undefined) {
+      before = valueAt(each.before, above) ?? before;
     }
   }
   return before === change.before ? change : { ...change, before };
@@ -152,7 +195,7 @@ function withValueAt(
   if (key === undefined) return inner;
   if (typeof value !== 'object' || !Object.hasOwn(value, key)) return value;
   if (Array.isArray(value)) {
-    if (!/^\d+$/.test(key)) return value;
+    if (!isIndex(key)) return value;
     const copy: ContentValue[] = [...(value as readonly ContentValue[])];
     copy[Number(key)] = withValueAt(copy[Number(key)]!, rest, inner);
     return copy;
@@ -164,7 +207,7 @@ function withValueAt(
 function sameChange(a: Change, b: Change): boolean {
   return (
     a.path === b.path &&
-    JSON.stringify(a.before) === JSON.stringify(b.before) &&
-    JSON.stringify(a.after) === JSON.stringify(b.after)
+    sameValue(a.before, b.before) &&
+    sameValue(a.after, b.after)
   );
 }

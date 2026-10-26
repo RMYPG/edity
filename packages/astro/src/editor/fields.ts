@@ -6,11 +6,21 @@
 // Listeners sit on the document and find the Field from the event's target,
 // and paths are read from `data-edity-field` on each event, so Items that
 // lists.ts adds, moves or renumbers need nothing but `connect()`.
-import { effect, untracked } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
-import { fieldAt, fieldChange, pathPattern, valueAt } from './content.js';
+import { markedPath, markup, selector } from '../markup.js';
+import { pathPattern } from '../paths.js';
+import { fieldAt, fieldChange, valueAt } from './content.js';
 import type { ContentValue } from './draft.js';
+import { whileEditing, type On } from './edit-view.js';
 import css from './fields.css?inline';
+import {
+  offsetAtPoint,
+  rangeIn,
+  select,
+  selectionIn,
+  type Selected,
+} from './selection.js';
+import { adoptSheet } from './sheets.js';
 import type { EditorState } from './state.js';
 import {
   fieldValue,
@@ -23,7 +33,7 @@ import {
   type NumberFormat,
 } from './values.js';
 
-const field = '[data-edity-field]';
+const field = selector(markup.field);
 
 /** A Field whose value on the page has just changed. */
 export interface FieldInput {
@@ -78,9 +88,6 @@ interface Typed {
   readonly selection: Selected | undefined;
 }
 
-/** Start and end offsets of a selection in a Field's text. */
-type Selected = readonly [number, number];
-
 /** Starts editing the page's Fields, for as long as the Editor runs. */
 export function editFields(state: EditorState): Fields {
   if (state.page === undefined) {
@@ -92,8 +99,6 @@ export function editFields(state: EditorState): Fields {
 function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   const listeners = new Set<(input: FieldInput) => void>();
   const formatOf = numberFormats(page);
-  const sheet = new CSSStyleSheet();
-  sheet.replaceSync(css);
   /** Editable elements, with the attributes they had before. */
   const editable = new WeakMap<HTMLElement, Map<string, string | null>>();
   /** A focused Field's text when the caret entered it, for Escape (E4). */
@@ -101,8 +106,8 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   /** A focused number Field's last text that was a number (E5). */
   const lastNumber = new WeakMap<HTMLElement, Typed>();
 
-  const definitionOf = (element: HTMLElement) =>
-    fieldAt(page.fields, element.dataset.edityField ?? '');
+  const fieldDefinition = (element: HTMLElement) =>
+    fieldAt(page.fields, markedPath(element, markup.field));
 
   /** The editable Field an event happened in. */
   function fieldOf(target: EventTarget | null): HTMLElement | undefined {
@@ -120,7 +125,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
   }
 
   function makeEditable(element: HTMLElement): void {
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     if (definition === undefined) return;
     if (!editable.has(element)) {
       editable.set(
@@ -164,8 +169,8 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
 
   /** Records what the Client did to `element`'s Field, after any input. */
   function changed(element: HTMLElement): void {
-    const path = element.dataset.edityField ?? '';
-    const definition = definitionOf(element);
+    const path = markedPath(element, markup.field);
+    const definition = fieldDefinition(element);
     if (definition === undefined) return;
     const text = element.textContent ?? '';
     const elements = elementsOf(document, path);
@@ -192,17 +197,17 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
 
   /** Where in its text the editable form of a number Field puts `at`. */
   function editableAt(element: HTMLElement, at: number): number {
-    const format = formatOf(element.dataset.edityField ?? '');
+    const format = formatOf(markedPath(element, markup.field));
     return format.editable((element.textContent ?? '').slice(0, at)).length;
   }
 
   function focused(element: HTMLElement): void {
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     if (definition?.kind === 'number') {
       // Thousands separators would read as decimal separators, so the
       // Client edits `12.000` as `12000` (E5).
       const shown = element.textContent ?? '';
-      const text = formatOf(element.dataset.edityField ?? '').editable(shown);
+      const text = formatOf(markedPath(element, markup.field)).editable(shown);
       if (text !== shown) {
         const selection = selectionIn(element);
         const [start, end] =
@@ -235,7 +240,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     if (
       element === undefined ||
       element === document.activeElement ||
-      definitionOf(element)?.kind !== 'number'
+      fieldDefinition(element)?.kind !== 'number'
     ) {
       return;
     }
@@ -259,8 +264,8 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     if (element === document.activeElement) return;
     atFocus.delete(element);
     lastNumber.delete(element);
-    const path = element.dataset.edityField ?? '';
-    const definition = definitionOf(element);
+    const path = markedPath(element, markup.field);
+    const definition = fieldDefinition(element);
     if (definition === undefined) return;
     const text = element.textContent ?? '';
     const value = fieldValue(definition, text);
@@ -274,20 +279,20 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
           ? String(value)
           : text;
     const elements = elementsOf(document, path);
-    let changes = false;
+    let reformatted = false;
     for (const each of elements) {
       if (each.textContent !== shown) {
         each.textContent = shown;
-        changes = true;
+        reformatted = true;
       }
     }
-    if (changes) notify(path, definition, value, elements);
+    if (reformatted) notify(path, definition, value, elements);
   }
 
   /** Called after every input, once any composition has ended. */
   function typed(element: HTMLElement): void {
     flatten(element);
-    if (definitionOf(element)?.kind === 'number') {
+    if (fieldDefinition(element)?.kind === 'number') {
       const text = element.textContent ?? '';
       const last = lastNumber.get(element);
       // An IME or a dead key can insert what beforeinput could not refuse.
@@ -359,7 +364,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
       element.blur();
       return;
     }
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     if (definition?.kind !== 'number' || !insertions.has(event.inputType)) {
       return;
     }
@@ -374,7 +379,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     // plain-text elements.
     event.preventDefault();
     const pasted = event.clipboardData?.getData('text/plain') ?? '';
-    const definition = definitionOf(element);
+    const definition = fieldDefinition(element);
     let text = pastedText(pasted);
     if (definition?.kind === 'number') {
       const selection = selectionIn(element);
@@ -421,14 +426,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     return at === -1 ? undefined : all[at + step];
   }
 
-  function start(): () => void {
-    const listening = new AbortController();
-    const { signal } = listening;
-    const on = <K extends keyof DocumentEventMap>(
-      type: K,
-      listener: (event: DocumentEventMap[K]) => void,
-      capture = false,
-    ) => document.addEventListener(type, listener, { signal, capture });
+  function start(on: On): () => void {
     const forField =
       (handle: (element: HTMLElement) => void) => (event: Event) => {
         const element = fieldOf(event.target);
@@ -447,7 +445,7 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
       // Changing the text while an IME composes would break it: wait for
       // compositionend. Text Fields still follow along.
       if (!(event as InputEvent).isComposing) typed(element);
-      else if (definitionOf(element)?.kind === 'text') changed(element);
+      else if (fieldDefinition(element)?.kind === 'text') changed(element);
     });
     on('compositionend', forField(typed));
     on('paste', paste);
@@ -455,27 +453,20 @@ function editPage({ draft, view }: EditorState, page: PageMarker): Fields {
     // A middle click would open the link in a new tab.
     on('auxclick', guard, true);
 
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    const removeSheet = adoptSheet(document, css);
     connect(document);
 
     return () => {
       // Leaving a Field commits it, while the listeners still run.
       const active = fieldOf(document.activeElement);
       active?.blur();
-      listening.abort();
-      document.adoptedStyleSheets = document.adoptedStyleSheets.filter(
-        (each) => each !== sheet,
-      );
+      removeSheet();
       connect(document);
     };
   }
 
   // The visitor view (P7) leaves the page as a visitor sees it.
-  effect(() => {
-    if (view.value !== 'edit') return;
-    const stop = untracked(start);
-    return () => untracked(stop);
-  });
+  whileEditing(view, start);
 
   return {
     connect,
@@ -563,11 +554,7 @@ function fieldsIn(root: ParentNode): HTMLElement[] {
 
 /** Every element of `root` that shows the Field at `path`. */
 function elementsOf(root: ParentNode, path: string): HTMLElement[] {
-  return [
-    ...root.querySelectorAll<HTMLElement>(
-      `[data-edity-field="${CSS.escape(path)}"]`,
-    ),
-  ];
+  return [...root.querySelectorAll<HTMLElement>(selector(markup.field, path))];
 }
 
 /**
@@ -578,7 +565,7 @@ function elementsOf(root: ParentNode, path: string): HTMLElement[] {
 function numberFormats(page: PageMarker): (path: string) => NumberFormat {
   const found = new Map<string, NumberFormat>();
   for (const element of document.querySelectorAll<HTMLElement>(field)) {
-    const path = element.dataset.edityField ?? '';
+    const path = markedPath(element, markup.field);
     const pattern = pathPattern(path);
     const value = valueAt(page.content, path);
     if (
@@ -608,13 +595,6 @@ function numberFormats(page: PageMarker): (path: string) => NumberFormat {
   };
 }
 
-/** Where the selection is in `element`'s text, if it is inside it. */
-function selectionIn(element: HTMLElement): Selected | undefined {
-  const selection = element.ownerDocument.getSelection();
-  if (selection === null || selection.rangeCount === 0) return undefined;
-  return rangeIn(element, selection.getRangeAt(0));
-}
-
 /** The range an input event is about to change, or the selection. */
 function targetOf(
   element: HTMLElement,
@@ -622,69 +602,4 @@ function targetOf(
 ): Selected | undefined {
   const [range] = event.getTargetRanges();
   return (range && rangeIn(element, range)) ?? selectionIn(element);
-}
-
-function rangeIn(
-  element: HTMLElement,
-  range: AbstractRange,
-): Selected | undefined {
-  if (
-    !element.contains(range.startContainer) ||
-    !element.contains(range.endContainer)
-  ) {
-    return undefined;
-  }
-  return [
-    offsetIn(element, range.startContainer, range.startOffset),
-    offsetIn(element, range.endContainer, range.endOffset),
-  ];
-}
-
-/** The offset in `element`'s text nearest to a point in the viewport. */
-function offsetAtPoint(
-  element: HTMLElement,
-  x: number,
-  y: number,
-): number | undefined {
-  const document = element.ownerDocument;
-  // Safari has only caretRangeFromPoint.
-  const position = document.caretPositionFromPoint?.(x, y);
-  const range = position ? undefined : document.caretRangeFromPoint?.(x, y);
-  const node = position?.offsetNode ?? range?.startContainer;
-  const offset = position?.offset ?? range?.startOffset;
-  if (node === undefined || offset === undefined || !element.contains(node)) {
-    return undefined;
-  }
-  return offsetIn(element, node, offset);
-}
-
-function offsetIn(element: HTMLElement, node: Node, offset: number): number {
-  const before = element.ownerDocument.createRange();
-  before.setStart(element, 0);
-  before.setEnd(node, offset);
-  return before.toString().length;
-}
-
-/** Selects from `start` to `end` in `element`'s text. */
-function select(element: HTMLElement, [start, end]: Selected): void {
-  const range = element.ownerDocument.createRange();
-  range.setStart(...position(element, start));
-  range.setEnd(...position(element, end));
-  const selection = element.ownerDocument.getSelection();
-  selection?.removeAllRanges();
-  selection?.addRange(range);
-}
-
-function position(element: HTMLElement, offset: number): [Node, number] {
-  const walker = element.ownerDocument.createTreeWalker(
-    element,
-    NodeFilter.SHOW_TEXT,
-  );
-  let rest = offset;
-  for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-    const length = (node as Text).length;
-    if (rest <= length) return [node, rest];
-    rest -= length;
-  }
-  return [element, element.childNodes.length];
 }

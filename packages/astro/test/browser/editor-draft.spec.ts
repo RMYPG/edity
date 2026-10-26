@@ -2,8 +2,19 @@
 // or a closed tab, without the Changes whose Field or List the page no
 // longer has, and each Change keeps the value before that the Client first
 // changed. The phone preview shows it all, its Lists included (P6).
-import type { FrameLocator, Locator, Page } from '@playwright/test';
-import { ana, expect, keepDraft, keptDraft, test } from './editor.js';
+import type { FrameLocator, Page } from '@playwright/test';
+import {
+  ana,
+  caretAtEnd,
+  editAll,
+  expect,
+  field,
+  focusField,
+  keepDraft,
+  keptDraft,
+  test,
+  texts,
+} from './editor.js';
 
 /** The fixture page as built, as `src/content/home.json` holds it. */
 const built = {
@@ -22,28 +33,6 @@ const built = {
     'Seguimiento por WhatsApp',
   ],
 } as const;
-
-/** The Site's elements that show the Field at `path`, on the page or in the preview. */
-function field(page: Page | FrameLocator, path: string): Locator {
-  return page.locator(`[data-edity-field="${path}"]`);
-}
-
-/** The text of the first Field of each Item of the List at `path`. */
-function texts(page: Page | FrameLocator, path: string): Promise<string[]> {
-  return page
-    .locator(`[data-edity-list="${path}"]`)
-    .evaluate((list) =>
-      [...list.children]
-        .filter((child) => child.hasAttribute('data-edity-item'))
-        .map(
-          (child) =>
-            (child.matches('[data-edity-field]')
-              ? child
-              : child.querySelector('[data-edity-field]')
-            )?.textContent ?? '',
-        ),
-    );
-}
 
 /** Every path in the List at `path`, templates included, in document order. */
 function paths(page: Page | FrameLocator, path: string): Promise<string[]> {
@@ -69,35 +58,6 @@ function paths(page: Page | FrameLocator, path: string): Promise<string[]> {
     walk(list);
     return found;
   });
-}
-
-/** Clicks near the start of the Field at `path`, so its Item's controls show. */
-async function focusField(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  const box = (await locator.boundingBox())!;
-  await locator.click({ position: { x: 4, y: box.height / 2 } });
-  await expect(locator).toBeFocused();
-  return locator;
-}
-
-/** Clicks into the Field at `path` and selects its text. */
-async function editAll(page: Page, path: string): Promise<Locator> {
-  const locator = field(page, path).first();
-  await locator.click();
-  await expect(locator).toBeFocused();
-  await page.keyboard.press('ControlOrMeta+A');
-  return locator;
-}
-
-async function caretAtEnd(locator: Locator): Promise<Locator> {
-  await locator.evaluate((element) => {
-    const range = document.createRange();
-    range.selectNodeContents(element);
-    range.collapse(false);
-    getSelection()!.removeAllRanges();
-    getSelection()!.addRange(range);
-  });
-  return locator;
 }
 
 test('reloading mid-edit restores every Change and the count (P2)', async ({

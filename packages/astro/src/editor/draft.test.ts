@@ -206,3 +206,105 @@ describe('Draft', () => {
     });
   });
 });
+
+describe('isChanged (L7)', () => {
+  const content = {
+    hero: { title: 'Fisioterapia', lead: 'Una hora' },
+    services: ['Suelo pélvico', 'Punción seca', 'Masaje'],
+    plans: [
+      { name: 'Básico', features: ['Una sesión'] },
+      { name: 'Completo', features: ['Cuatro', 'Plan'] },
+    ],
+  };
+
+  test('a Field with a Change changed, and one without did not', () => {
+    const draft = new Draft([
+      { path: 'hero.title', before: 'Fisioterapia', after: 'Fisio' },
+      { path: 'services.1', before: 'Punción seca', after: 'Punción' },
+    ]);
+
+    expect(draft.isChanged('hero.title', content)).toBe(true);
+    expect(draft.isChanged('services.1', content)).toBe(true);
+    expect(draft.isChanged('hero.lead', content)).toBe(false);
+    expect(draft.isChanged('hero.titles', content)).toBe(false);
+    expect(draft.isChanged('services.0', content)).toBe(false);
+  });
+
+  test('in a List whose structure changed, new and edited Items changed, and built ones that only moved did not (S7)', () => {
+    const draft = new Draft([
+      {
+        path: 'services',
+        before: content.services,
+        after: ['Masaje', 'Suelo pélvico', 'Punción', 'Pilates'],
+      },
+      {
+        path: 'plans',
+        before: content.plans,
+        after: [
+          { name: 'Completo', features: ['Cuatro', 'Plan'] },
+          { name: 'Básico', features: ['Una sesión', 'Correo'] },
+        ],
+      },
+    ]);
+
+    expect(draft.isChanged('services.0', content)).toBe(false);
+    expect(draft.isChanged('services.1', content)).toBe(false);
+    expect(draft.isChanged('services.2', content)).toBe(true);
+    expect(draft.isChanged('services.3', content)).toBe(true);
+    expect(draft.isChanged('plans.0.name', content)).toBe(false);
+    expect(draft.isChanged('plans.0.features.1', content)).toBe(false);
+    // The card whose List gained an Item.
+    expect(draft.isChanged('plans.1.name', content)).toBe(true);
+    expect(draft.isChanged('plans.1.features.0', content)).toBe(true);
+    expect(draft.isChanged('plansx.0', content)).toBe(false);
+  });
+
+  test('so does a List inside an Item, while the outer List is as built', () => {
+    const draft = new Draft([
+      {
+        path: 'plans.1.features',
+        before: content.plans[1]!.features,
+        after: ['Plan', 'Cuatro', 'Seguimiento'],
+      },
+    ]);
+
+    expect(draft.isChanged('plans.1.features.0', content)).toBe(false);
+    expect(draft.isChanged('plans.1.features.2', content)).toBe(true);
+    expect(draft.isChanged('plans.1.name', content)).toBe(false);
+  });
+});
+
+describe('valueAt', () => {
+  const content = {
+    visit: { price: 35 },
+    plans: [
+      { name: 'Básico', price: 19.99 },
+      { name: 'Completo', price: 49.5 },
+    ],
+  };
+
+  test("is a Change's after, or the value in the List Change it is in", () => {
+    const draft = new Draft([
+      { path: 'visit.price', before: 35, after: '13.000' },
+      {
+        path: 'plans',
+        before: content.plans,
+        after: [{ name: 'Completo', price: 45 }],
+      },
+    ]);
+
+    expect(draft.valueAt('visit.price', content)).toBe('13.000');
+    expect(draft.valueAt('plans.0.price', content)).toBe(45);
+    expect(draft.valueAt('plans.1.price', content)).toBeUndefined();
+  });
+
+  test('is the built value where the Draft holds none', () => {
+    const draft = new Draft([
+      { path: 'plans.1.price', before: 49.5, after: 45 },
+    ]);
+
+    expect(draft.valueAt('visit.price', content)).toBe(35);
+    expect(draft.valueAt('plans.0.price', content)).toBe(19.99);
+    expect(draft.valueAt('plans.1.price', content)).toBe(45);
+  });
+});

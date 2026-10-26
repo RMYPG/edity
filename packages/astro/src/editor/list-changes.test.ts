@@ -9,11 +9,9 @@ import {
 import { describe, expect, test } from 'vitest';
 import type { ContentValue } from './draft.js';
 import {
-  blankValue,
-  itemPathOf,
   listAt,
   listChanges,
-  listPathOf,
+  newItemValue,
   originsOf,
   type ItemNow,
   type ListNow,
@@ -93,40 +91,6 @@ describe('listAt', () => {
     for (const path of ['hero.title', 'plans.1', 'services.0', 'nope', '']) {
       expect(listAt(fields, path), path).toBeUndefined();
     }
-  });
-});
-
-describe('listPathOf', () => {
-  test('is the outermost List a path is in', () => {
-    expect(listPathOf('plans.1.features.0')).toBe('plans');
-    expect(listPathOf('plans.1.features')).toBe('plans');
-    expect(listPathOf('plans.0.price')).toBe('plans');
-    expect(listPathOf('services.3')).toBe('services');
-    expect(listPathOf('footer.links.0')).toBe('footer.links');
-  });
-
-  test('is undefined outside Lists, and for a List outside Lists', () => {
-    expect(listPathOf('hero.title')).toBeUndefined();
-    expect(listPathOf('services')).toBeUndefined();
-  });
-});
-
-describe('itemPathOf', () => {
-  test('is the Item a Field belongs to, and its key there', () => {
-    expect(itemPathOf('plans.1.price')).toEqual({
-      item: 'plans.1',
-      key: 'price',
-    });
-    expect(itemPathOf('plans.1.features.0')).toEqual({
-      item: 'plans.1.features.0',
-      key: '',
-    });
-    expect(itemPathOf('services.2')).toEqual({ item: 'services.2', key: '' });
-  });
-
-  test('is undefined outside Lists', () => {
-    expect(itemPathOf('hero.title')).toBeUndefined();
-    expect(itemPathOf('services')).toBeUndefined();
   });
 });
 
@@ -294,10 +258,10 @@ describe('originsOf', () => {
   });
 });
 
-describe('blankValue', () => {
-  test('is what a new Item holds: empty Fields and the fewest Items its Lists take', () => {
-    expect(blankValue(listAt(fields, 'services')!.item)).toBe('');
-    expect(blankValue(listAt(fields, 'plans')!.item)).toEqual({
+describe('newItemValue', () => {
+  test('is what a new Item holds: empty Fields, numbers too, and the fewest Items its Lists take', () => {
+    expect(newItemValue(listAt(fields, 'services')!.item)).toBe('');
+    expect(newItemValue(listAt(fields, 'plans')!.item)).toEqual({
       name: '',
       price: '',
       features: [''],
