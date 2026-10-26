@@ -112,6 +112,15 @@ describe('list', () => {
     );
   });
 
+  test('throws on an Item key that content paths would misread', () => {
+    expect(() => list({ '1': name }, bounds)).toThrow(
+      '"1" in an Item can\'t be a key: a key must not be empty, only digits, "*" or hold a dot',
+    );
+    expect(() => list({ 'price.amount': name }, bounds)).toThrow(
+      '"price.amount" in an Item can\'t be a key',
+    );
+  });
+
   test('throws on Limits no List could meet', () => {
     expect(() => list(bullet, { min: 3, max: 2 })).toThrow(
       'min must not be greater than max, got min 3 and max 2',

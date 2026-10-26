@@ -100,6 +100,31 @@ describe('defineFields', () => {
       '"hero.title" must be a Field, a List or an object of them, made with text(), number() and list()',
     );
   });
+
+  test('throws on a key that content paths would misread, naming its path', () => {
+    const title = text({ maxChars: 20 });
+    // Digits name an Item's place in a List, and a dot separates keys.
+    expect(() => defineFields({ '2026': title })).toThrow(
+      '"2026" can\'t be a key: a key must not be empty, only digits, "*" or hold a dot',
+    );
+    expect(() => defineFields({ hero: { '0': title } })).toThrow(
+      '"hero.0" can\'t be a key',
+    );
+    expect(() => defineFields({ 'hero.title': title })).toThrow(
+      '"hero.title" can\'t be a key',
+    );
+    expect(() => defineFields({ '': title })).toThrow('"" can\'t be a key');
+    expect(() => defineFields({ '*': title })).toThrow('"*" can\'t be a key');
+  });
+
+  test('accepts keys with digits among letters', () => {
+    expect(() =>
+      defineFields({
+        year2026: text({ maxChars: 20 }),
+        '2x': text({ maxChars: 20 }),
+      }),
+    ).not.toThrow();
+  });
 });
 
 describe('definitionOf', () => {

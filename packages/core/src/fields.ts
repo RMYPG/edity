@@ -300,6 +300,9 @@ function toItem(item: unknown): {
   const shape: Record<string, Definition> = {};
   const lists: string[] = [];
   for (const [key, value] of Object.entries(item)) {
+    if (!isKey(key)) {
+      throw new TypeError(`"${key}" in an Item ${notAKey}`);
+    }
     const field = definitionOf(value);
     if (field === undefined || field.kind === 'object') {
       throw new TypeError(
@@ -368,6 +371,18 @@ function listKeys(definition: Definition): string[] {
     .map(([key]) => key);
 }
 
+/**
+ * Whether `key` can name a Field, a List or a group of Fields. Content paths
+ * such as `plans.1.price` separate keys with dots and name an Item by its
+ * place in its List, in digits; the Editor writes any Item as `*`.
+ */
+function isKey(key: string): boolean {
+  return key !== '' && key !== '*' && !key.includes('.') && !/^\d+$/.test(key);
+}
+
+const notAKey =
+  'can\'t be a key: a key must not be empty, only digits, "*" or hold a dot';
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null) return false;
   const prototype: unknown = Object.getPrototypeOf(value);
@@ -387,6 +402,9 @@ function toObject(shape: Record<string, unknown>, path: string): z.ZodType {
   const definitions: Record<string, Definition> = {};
   for (const [key, value] of Object.entries(shape)) {
     const at = path === '' ? key : `${path}.${key}`;
+    if (!isKey(key)) {
+      throw new TypeError(`"${at}" ${notAKey}`);
+    }
     const definition = definitionOf(value);
     let schema: z.ZodType;
     if (definition !== undefined && definition.kind !== 'object') {

@@ -31,3 +31,5 @@ Text Fields are required and single-line, since the spec defers Fields that can 
 Left over: `@edity/astro` will need `zod` as a peer dependency too once it uses core (ticket 07).
 
 2026-10-26: Draft validation moved into core (review fix): `violations(definition, value)` in `violations.ts` checks a value against the plain definitions `definitionOf` returns, and `decimalPlaces()`, the one count of decimals, is exported. A test runs them and the Zod schemas over the same values, and the contract test adds them as a third verdict. `number()` now throws on a negative `min`, since the Editor takes no minus sign (E5).
+
+2026-10-26: `defineFields` and `list()` refuse a key that content paths would misread (codex review fix): empty, only digits (such as `"2026"`, which reads as an Item's place in a List), `"*"`, or holding a dot. Before, a Field named `"2026"` rendered as editable but its edits never reached the Draft.
