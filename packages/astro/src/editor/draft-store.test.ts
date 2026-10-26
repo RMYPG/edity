@@ -70,6 +70,23 @@ describe('draftStore', () => {
     expect(store.load()).toEqual([]);
   });
 
+  test("keeps which built Item each Item of a List Change is, and drops a Change whose origins can't be", () => {
+    const storage = memory();
+    const store = draftStore('fixture', 'home', () => storage);
+    const moved: Change = { ...services, origins: [1, 0, null] };
+    store.keep([moved]);
+
+    expect(store.load()).toEqual([moved]);
+
+    storage.items.set(
+      'edity:draft:v1:fixture:home',
+      JSON.stringify({
+        changes: [{ ...services, origins: ['1', 0, null] }, title],
+      }),
+    );
+    expect(store.load()).toEqual([title]);
+  });
+
   test('gives back no Changes when it kept none, or what it kept cannot be read', () => {
     const storage = memory();
     const store = draftStore('fixture', 'home', () => storage);

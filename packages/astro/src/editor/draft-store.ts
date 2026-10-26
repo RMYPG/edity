@@ -75,12 +75,18 @@ export function keepDraft(draft: Draft, store: DraftStore): () => void {
 
 function isChange(value: unknown): value is Change {
   if (typeof value !== 'object' || value === null) return false;
-  const { path, before, after } = value as Record<string, unknown>;
+  const { path, before, after, origins } = value as Record<string, unknown>;
   return (
     typeof path === 'string' &&
     path !== '' &&
     isContentValue(before) &&
-    isContentValue(after)
+    isContentValue(after) &&
+    (origins === undefined ||
+      (Array.isArray(origins) &&
+        origins.every(
+          (origin) =>
+            origin === null || (Number.isInteger(origin) && origin >= 0),
+        )))
   );
 }
 

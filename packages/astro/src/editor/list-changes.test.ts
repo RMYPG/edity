@@ -9,6 +9,7 @@ import {
 import { describe, expect, test } from 'vitest';
 import type { ContentValue } from './draft.js';
 import {
+  changeOrigins,
   listAt,
   listChanges,
   newItemValue,
@@ -134,6 +135,7 @@ describe('listChanges', () => {
         path: 'services',
         before: content.services,
         after: ['Suelo pélvico', 'Punción seca', 'Deportiva'],
+        origins: [1, 0, 2],
       },
     ]);
   });
@@ -150,6 +152,7 @@ describe('listChanges', () => {
         path: 'services',
         before: content.services,
         after: [...content.services, 'Masaje'],
+        origins: [0, 1, 2, null],
       },
     ]);
 
@@ -164,6 +167,7 @@ describe('listChanges', () => {
         path: 'services',
         before: content.services,
         after: ['Punción', 'Deportiva'],
+        origins: [0, 2],
       },
     ]);
   });
@@ -200,6 +204,7 @@ describe('listChanges', () => {
         path: 'plans.1.features',
         before: ['Cuatro sesiones', 'Plan'],
         after: ['Plan', 'Cuatro sesiones'],
+        origins: [1, 0],
       },
     ]);
   });
@@ -225,6 +230,7 @@ describe('listChanges', () => {
         path: 'plans',
         before: content.plans,
         after: [{ ...completo, features: ['Plan'] }, basico, newPlan],
+        origins: [1, 0, null],
       },
     ]);
   });
@@ -243,6 +249,55 @@ describe('listChanges', () => {
   test('is empty for a path that is not a List of the page', () => {
     expect(listChanges(page, 'hero.title', { items: [] })).toEqual([]);
     expect(listChanges(page, 'nope', { items: [] })).toEqual([]);
+  });
+});
+
+describe('changeOrigins', () => {
+  const built = content.services;
+  // "Punción seca" edited to "Punción" and moved last.
+  const moved = {
+    before: built,
+    after: ['Suelo pélvico', 'Deportiva', 'Punción'],
+  };
+
+  test('tells an edited Item apart by the origins the Draft kept', () => {
+    expect(changeOrigins(built, { ...moved, origins: [1, 2, 0] })).toEqual([
+      1, 2, 0,
+    ]);
+    expect(
+      changeOrigins(built, {
+        before: built,
+        after: [...built, 'Masaje'],
+        origins: [0, 1, 2, null],
+      }),
+    ).toEqual([0, 1, 2, undefined]);
+  });
+
+  test('matches by value without kept origins, or once the List as built changed', () => {
+    // An edited Item then matches no built one, and counts as new.
+    expect(changeOrigins(built, moved)).toEqual([1, 2, undefined]);
+    expect(
+      changeOrigins(['Punción seca', 'Suelo pélvico', 'Deportiva', 'Masaje'], {
+        ...moved,
+        origins: [1, 2, 0],
+      }),
+    ).toEqual([1, 2, undefined]);
+  });
+
+  test('ignores kept origins that do not fit the List', () => {
+    for (const origins of [
+      [1, 2],
+      [1, 2, 0, null],
+      [1, 1, 0],
+      [1, 2, 3],
+      [1, 2, -1],
+      [1, 2, 0.5],
+    ]) {
+      expect(
+        changeOrigins(built, { ...moved, origins }),
+        String(origins),
+      ).toEqual([1, 2, undefined]);
+    }
   });
 });
 

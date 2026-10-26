@@ -58,7 +58,8 @@ export function listChanges(
     list.items.every((item, index) => item.origin === index);
   if (!asBuilt) {
     const after = list.items.map((item) => item.value);
-    return sameValue(before, after) ? [] : [{ path, before, after }];
+    const origins = list.items.map((item) => item.origin ?? null);
+    return sameValue(before, after) ? [] : [{ path, before, after, origins }];
   }
   return list.items.flatMap((item, index) =>
     itemChanges(page, definition.item, childPath(path, index), item),
@@ -111,6 +112,39 @@ export function originsOf(
     taken.add(origin);
     return origin;
   });
+}
+
+/**
+ * Which built Item each Item of a List Change's `after` is: the `origins`
+ * the Draft kept with it, while the List as built is still the one the
+ * Change was first made on (its `before`), so an edited Item stays the Item
+ * it was. Else, as after a newer Release, they are matched by value
+ * (`originsOf`). Kept origins that don't fit `after` and `built` are
+ * ignored.
+ */
+export function changeOrigins(
+  built: readonly ContentValue[],
+  { before, after, origins }: Pick<Change, 'before' | 'after' | 'origins'>,
+): (number | undefined)[] {
+  const items = Array.isArray(after) ? (after as readonly ContentValue[]) : [];
+  const kept = new Set<number>();
+  const fits =
+    origins !== undefined &&
+    origins.length === items.length &&
+    sameValue(before, built) &&
+    origins.every((origin) => {
+      if (origin === null) return true;
+      const fresh =
+        Number.isInteger(origin) &&
+        origin >= 0 &&
+        origin < built.length &&
+        !kept.has(origin);
+      kept.add(origin);
+      return fresh;
+    });
+  return fits
+    ? origins.map((origin) => origin ?? undefined)
+    : originsOf(built, items);
 }
 
 /**

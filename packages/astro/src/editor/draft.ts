@@ -1,7 +1,7 @@
 import { computed, signal, type ReadonlySignal } from '@preact/signals';
 import { isIndex, isWithin, itemIndexIn, keysOf, pathUnder } from '../paths.js';
 import { sameValue, valueAt } from './content.js';
-import { originsOf } from './list-changes.js';
+import { changeOrigins } from './list-changes.js';
 
 /**
  * A value in a page's content: a Field's text or number, or a List's Items.
@@ -29,6 +29,14 @@ export interface Change {
   readonly before: ContentValue;
   /** The value in the Draft. */
   readonly after: ContentValue;
+  /**
+   * For a List whose structure changed: which Item of the List as built each
+   * Item of `after` is, by its index there, or `null` for an Item added in
+   * this Draft. The Draft keeps it with the Change, so a List restored after
+   * a reload knows its edited Items too (`changeOrigins`). Publish does not
+   * send it.
+   */
+  readonly origins?: readonly (number | null)[];
 }
 
 /**
@@ -133,8 +141,8 @@ export class Draft {
    * (S7), in an Item that is not one of the List's built Items. A built
    * Item that only moved shows what was published (L7).
    *
-   * Items are matched by value, as a List shown from a Draft gets its Items
-   * back (`originsOf`), so the phone preview tells the same as the page.
+   * Items are matched as a List shown from a Draft gets its Items back
+   * (`changeOrigins`), so the phone preview tells the same as the page.
    */
   isChanged(path: string, content: unknown): boolean {
     for (const change of this.#changes.value.values()) {
@@ -149,7 +157,14 @@ export class Draft {
       ) {
         return true;
       }
-      return originsOf(built, change.after)[index] === undefined;
+      const origin = changeOrigins(built, change)[index];
+      return (
+        origin === undefined ||
+        !sameValue(
+          built[origin],
+          (change.after as readonly ContentValue[])[index],
+        )
+      );
     }
     return false;
   }

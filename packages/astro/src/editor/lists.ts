@@ -18,12 +18,13 @@ import type { PageMarker } from '../editable.js';
 import { markedPath, markup, selector } from '../markup.js';
 import { childPath, itemPathOf, listPathOf } from '../paths.js';
 import { valueAt } from './content.js';
-import type { ContentValue } from './draft.js';
+import type { Change, ContentValue } from './draft.js';
 import { sameRow } from './drop.js';
 import { whileEditing, type On } from './edit-view.js';
 import type { Fields } from './fields.js';
 import { dragItems } from './list-drag.js';
 import {
+  changeOrigins,
   listAt,
   listChanges,
   newItemValue,
@@ -55,13 +56,20 @@ export interface Lists {
    * Shows `value` as the Items of the List at `path` in `root`, such as a
    * List Change's built value on Discard or a restored `after`. An Item that
    * holds a built Item's value is that Item, as built, and the others are
-   * new, from the List's template in `root`. Does nothing for a path that is
-   * not a List `root` shows.
+   * new, from the List's template in `root`. With the List `change` it shows
+   * the `after` of, its built Items are told apart by the origins it kept,
+   * so an edited Item is still the Item it was (`changeOrigins`). Does
+   * nothing for a path that is not a List `root` shows.
    *
    * It records no Change. In a document other than the page, such as the
    * phone preview's, the Items stay as a visitor sees them.
    */
-  show(path: string, value: ContentValue, root?: ParentNode): void;
+  show(
+    path: string,
+    value: ContentValue,
+    root?: ParentNode,
+    change?: Pick<Change, 'before' | 'origins'>,
+  ): void;
   /** What the List controls show, and what they do. */
   readonly controls: ListsUi;
 }
@@ -431,11 +439,18 @@ function editPage(
     }
   }
 
-  function showList(list: HTMLElement, value: readonly ContentValue[]): void {
+  function showList(
+    list: HTMLElement,
+    value: readonly ContentValue[],
+    change?: Pick<Change, 'before' | 'origins'>,
+  ): void {
     const model = lists.get(list);
     const definition = listDefinition(list);
     if (model === undefined || definition === undefined) return;
-    const origins = originsOf(model.values, value);
+    const origins =
+      change === undefined
+        ? originsOf(model.values, value)
+        : changeOrigins(model.values, { ...change, after: value });
     // New Items on the page are used before new ones from the template.
     const spare = itemsOf(list).filter(
       (element) => items.get(element)?.origin === undefined,
@@ -803,15 +818,15 @@ function editPage(
   whileEditing(view, start);
 
   return {
-    show(path, value, root = document) {
+    show(path, value, root = document, change) {
       const list = listAtPath(path, root);
       if (list === undefined || !Array.isArray(value)) return;
       if (!onPage(list)) {
-        batch(() => showList(list, value));
+        batch(() => showList(list, value, change));
         return;
       }
       undos.dismiss();
-      quietly(() => showList(list, value));
+      quietly(() => showList(list, value, change));
       relayout();
     },
     controls: {

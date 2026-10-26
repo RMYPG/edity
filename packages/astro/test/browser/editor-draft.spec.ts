@@ -220,6 +220,36 @@ test('a Draft with a Change to a removed Field restores the rest and shows "1 ch
   await expect(editor.getByText(/ya no se aplica/)).toHaveCount(0);
 });
 
+test('an edited Item is still the same Item after a reload, so moving it back leaves one Field Change (S7)', async ({
+  page,
+  openEditor,
+  editor,
+  bar,
+}) => {
+  await openEditor();
+  await editAll(page, 'services.0');
+  await page.keyboard.type('Deportiva');
+  await editor.getByRole('button', { name: 'Bajar «Deportiva»' }).click();
+  const [first, second, ...rest] = built.services;
+  await expect
+    .poll(() => texts(page, 'services'))
+    .toEqual([second, 'Deportiva', ...rest]);
+
+  await page.reload();
+  await expect(bar).toBeVisible();
+  await focusField(page, 'services.1');
+  await editor.getByRole('button', { name: 'Subir «Deportiva»' }).click();
+
+  await expect
+    .poll(() => texts(page, 'services'))
+    .toEqual(['Deportiva', second, ...rest]);
+  await expect(bar.getByRole('status')).toHaveText('1 cambio');
+  // The List is as built again, so only the Field's edit is left.
+  expect(await keptDraft(page)).toEqual([
+    { path: 'services.0', before: first, after: 'Deportiva' },
+  ]);
+});
+
 test('a kept Change with a value its Field or List could never hold is dropped, and the Editor still starts', async ({
   page,
   openEditor,
@@ -325,6 +355,8 @@ test('a restored Change keeps the value before that the Client first changed, fo
           built.services[3],
           'Masaje deportivo',
         ],
+        // Which Item of the List as built each one is, with null for new.
+        origins: [1, 0, 2, 3, null],
       },
     ]);
   await expect(bar.getByRole('status')).toHaveText('2 cambios');

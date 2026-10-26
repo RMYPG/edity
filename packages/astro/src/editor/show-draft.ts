@@ -31,7 +31,7 @@ export function showDraft(
         continue;
       }
       // Each ignores the other's paths.
-      lists.show(change.path, change.after, root);
+      lists.show(change.path, change.after, root, change);
       fields.show(change.path, change.after, root);
     }
   });
@@ -90,8 +90,12 @@ export function draftDelta(
 /**
  * `change` with its value in `content` as `after`, to put it back as built.
  * Its `before` can be older: the value it had when the Client first changed
- * it, in an earlier Release.
+ * it, in an earlier Release. Its Items' origins went with its `after`.
  */
 export function asBuilt(change: Change, content: unknown): Change {
-  return { ...change, after: valueAt(content, change.path) ?? change.before };
+  return {
+    path: change.path,
+    before: change.before,
+    after: valueAt(content, change.path) ?? change.before,
+  };
 }

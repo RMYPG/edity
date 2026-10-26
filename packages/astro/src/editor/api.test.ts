@@ -12,6 +12,8 @@ describe('publishRequest', () => {
         path: 'services',
         before: ['Suelo pélvico', 'Punción seca'],
         after: ['Punción seca', 'Suelo pélvico', 'Masaje'],
+        // Only the Draft keeps these.
+        origins: [1, 0, null],
       },
     ]);
 
