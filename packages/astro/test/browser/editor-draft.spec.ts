@@ -220,6 +220,31 @@ test('a Draft with a Change to a removed Field restores the rest and shows "1 ch
   await expect(editor.getByText(/ya no se aplica/)).toHaveCount(0);
 });
 
+test('a kept Change with a value its Field or List could never hold is dropped, and the Editor still starts', async ({
+  page,
+  openEditor,
+  editor,
+  bar,
+}) => {
+  const cta = { path: 'hero.cta', before: built.cta, after: 'Pide cita' };
+  await keepDraft(page, [
+    // An Item of a text List that is no text: showing it threw before the
+    // Editor started, on every reload.
+    { path: 'services', before: built.services, after: [{ toString: '' }] },
+    // Neither a number nor text typed into a number Field.
+    { path: 'visit.price', before: 35, after: { amount: 40 } },
+    cta,
+  ]);
+
+  await openEditor();
+
+  await expect(bar.getByRole('status')).toHaveText('1 cambio');
+  await expect(field(page, 'hero.cta')).toHaveText('Pide cita');
+  await expect(field(page, 'services.0')).toHaveText(built.services[0]!);
+  await expect(editor.getByText('2 cambios ya no se aplican')).toBeVisible();
+  expect(await keptDraft(page)).toEqual([cta]);
+});
+
 test('Changes to Items and Lists the page no longer has are dropped too, and the notice goes once the Client edits', async ({
   page,
   openEditor,

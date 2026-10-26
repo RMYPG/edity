@@ -160,3 +160,54 @@ export function isWellFormed(
     )
   );
 }
+
+/**
+ * Whether a Change is to a Field or a List the page has, with values that
+ * Field or List can hold while the Client edits: text, a number or the text
+ * typed into a number Field so far, and Items with exactly their Fields.
+ * A Draft kept in the browser is checked with it before it is shown, since
+ * anything on the Site's origin can write there.
+ */
+export function fitsDraft(fields: ObjectDefinition, change: Change): boolean {
+  const definition = definitionAt(fields, change.path);
+  return (
+    definition !== undefined &&
+    definition.kind !== 'object' &&
+    holds(definition, change.before) &&
+    holds(definition, change.after)
+  );
+}
+
+function holds(definition: Definition, value: unknown): boolean {
+  switch (definition.kind) {
+    case 'text':
+      return typeof value === 'string';
+    case 'number':
+      return (
+        typeof value === 'string' ||
+        (typeof value === 'number' && Number.isFinite(value))
+      );
+    case 'list':
+      return (
+        Array.isArray(value) &&
+        value.every((item) => holds(definition.item, item))
+      );
+    case 'object': {
+      if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return false;
+      }
+      const keys = Object.keys(definition.shape);
+      return (
+        Object.keys(value).length === keys.length &&
+        keys.every(
+          (key) =>
+            Object.hasOwn(value, key) &&
+            holds(
+              definition.shape[key]!,
+              (value as Record<string, unknown>)[key],
+            ),
+        )
+      );
+    }
+  }
+}

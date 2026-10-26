@@ -4,6 +4,7 @@ import { effect } from '@preact/signals';
 import { render } from 'preact';
 import { markup } from '../markup.js';
 import { getSession } from './api.js';
+import { fitsDraft } from './content.js';
 import { editorRoot, readPage } from './documents.js';
 import { draftStore, keepDraft, type DraftStore } from './draft-store.js';
 import { Editor } from './Editor.js';
@@ -39,11 +40,17 @@ async function start(): Promise<void> {
         page === undefined
           ? undefined
           : draftStore(result.session.site, page.page);
+      // Before anything reads them: a kept Change its Field or List could
+      // never hold would break the Editor on every page load.
+      const kept = store?.load() ?? [];
+      const changes = kept.filter(
+        (change) => page !== undefined && fitsDraft(page.fields, change),
+      );
       const state = createEditorState({
         session: result.session,
         page,
         languages: navigator.languages,
-        changes: store?.load(),
+        changes,
       });
       const fields = editFields(state);
       const editing: Editing = {
@@ -52,7 +59,9 @@ async function start(): Promise<void> {
         lists: editLists(state, fields),
         limits: watchLimits(state, fields),
       };
-      if (store !== undefined) restore(editing, store);
+      if (store !== undefined) {
+        restore(editing, store, kept.length - changes.length);
+      }
       mount(editing);
       return;
     }
@@ -79,11 +88,12 @@ async function startPreview(): Promise<void> {
 
 /**
  * Shows the Draft kept in the browser on the page, tells the Client how many
- * of its Changes no longer apply, and keeps the Draft there from now on.
+ * of its Changes no longer apply, `dropped` already among them, and keeps the
+ * Draft there from now on.
  */
-function restore(editing: Editing, store: DraftStore): void {
+function restore(editing: Editing, store: DraftStore, dropped: number): void {
   const { draft, notApplied } = editing.state;
-  notApplied.value = restoreDraft(editing);
+  notApplied.value = dropped + restoreDraft(editing);
   keepDraft(draft, store);
   // The notice is about the Draft as restored: it goes once the Client
   // changes it.

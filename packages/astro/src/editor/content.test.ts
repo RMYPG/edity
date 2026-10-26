@@ -11,10 +11,12 @@ import {
   definitionAt,
   fieldAt,
   fieldChange,
+  fitsDraft,
   isWellFormed,
   sameValue,
   valueAt,
 } from './content.js';
+import type { Change } from './draft.js';
 
 const fields = definitionOf(
   defineFields({
@@ -165,6 +167,53 @@ describe('fieldChange', () => {
       before: 35,
       after: '',
     });
+  });
+});
+
+describe('fitsDraft', () => {
+  test('takes a Change a Draft can hold, finished or not', () => {
+    for (const change of [
+      { path: 'hero.title', before: 'Hola', after: '' },
+      { path: 'visit.price', before: 35, after: 40 },
+      // Text typed into a number Field that is no number yet.
+      { path: 'visit.price', before: 35, after: '13.' },
+      { path: 'services', before: content.services, after: ['Uno', ''] },
+      { path: 'services.1', before: 'Suelo pélvico', after: 'Suelo' },
+      {
+        path: 'plans',
+        before: content.plans,
+        after: [{ name: '', price: '', features: [''] }],
+      },
+      { path: 'plans.0.features', before: ['Una'], after: ['Una', 'Dos'] },
+    ]) {
+      expect(fitsDraft(fields, change), change.path).toBe(true);
+    }
+  });
+
+  test('refuses a value its Field or List could never hold, before or after', () => {
+    const services = { path: 'services', before: content.services };
+    const plans = { path: 'plans', before: content.plans };
+    const plan = { name: 'Nuevo', price: 10, features: ['Una'] };
+    // Whatever a browser's storage held, so not all of them are Changes.
+    const kept: unknown[] = [
+      // An Item of a text List that is no text: showing it would throw.
+      { ...services, after: [{ toString: '' }] },
+      { ...services, after: 'Uno' },
+      { path: 'hero.title', before: 'Hola', after: ['Hola'] },
+      { path: 'visit.price', before: 35, after: { amount: 40 } },
+      { path: 'visit.price', before: { amount: 35 }, after: 40 },
+      { ...plans, after: [{ ...plan, notes: 'Más' }] },
+      { ...plans, after: [{ name: 'Nuevo', price: 10 }] },
+      { ...plans, after: [{ ...plan, features: 'Una' }] },
+      // A group of Fields, or nothing at all.
+      { path: 'hero', before: content.hero, after: { title: 'Adiós' } },
+      { path: 'hero.subtitle', before: 'Uno', after: 'Dos' },
+    ];
+    for (const change of kept) {
+      expect(fitsDraft(fields, change as Change), JSON.stringify(change)).toBe(
+        false,
+      );
+    }
   });
 });
 
