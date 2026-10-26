@@ -29,3 +29,5 @@ Terms: Field, List, Item, Limit, Field definitions (`CONTEXT.md`).
 Text Fields are required and single-line, since the spec defers Fields that can be left empty and stores single-paragraph text: `text()` rejects a value with no visible character or with a line break (`\n`, `\r`, U+2028, U+2029), through a `.regex()` that Zod emits as a JSON Schema `pattern` written to mean the same in ECMA-262 (`u` flag) and Go's RE2.
 
 Left over: `@edity/astro` will need `zod` as a peer dependency too once it uses core (ticket 07).
+
+2026-10-26: Draft validation moved into core (review fix): `violations(definition, value)` in `violations.ts` checks a value against the plain definitions `definitionOf` returns, and `decimalPlaces()`, the one count of decimals, is exported. A test runs them and the Zod schemas over the same values, and the contract test adds them as a third verdict. `number()` now throws on a negative `min`, since the Editor takes no minus sign (E5).
