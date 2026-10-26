@@ -5,8 +5,9 @@ name: Publish
 # published yet. Nothing is released until a maintainer runs
 # `npm stage approve <stage-id>` with 2FA, core first.
 #
-# npm trusts this workflow by its file name (publish.yml) for @edity/core
-# and @edity/astro, and only to stage: it can't publish directly.
+# npm trusts this workflow by its file name (publish.yml) and its GitHub
+# environment (npm) for @edity/core and @edity/astro, and only to stage: it
+# can't publish directly.
 
 on:
   push:
@@ -27,6 +28,9 @@ jobs:
     # npm trusted publishing doesn't support self-hosted runners, such as
     # Blacksmith's.
     runs-on: ubuntu-24.04
+    # npm's trusted publisher names this environment: a token from any other
+    # job is refused.
+    environment: npm
     timeout-minutes: 20
     permissions:
       contents: read

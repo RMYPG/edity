@@ -10,7 +10,7 @@ Inside the workspace, tsc and Vitest resolve `@edity/*` imports to each package'
 
 ## Releasing
 
-`@edity/core` and `@edity/astro` share one version. To release, bump `version` in both `packages/*/package.json` and merge to `main`. `.github/workflows/publish.yml` then runs every check and stages each version not yet on npm (`mise run publish:stage`). A maintainer releases it with `npm stage approve <stage-id>` and 2FA, core first. npm trusts that workflow to stage only, never to publish directly. `mise run publish:stage --dry-run` shows what would be staged.
+`@edity/core` and `@edity/astro` share one version. To release, bump `version` in both `packages/*/package.json` and merge to `main`. `.github/workflows/publish.yml` then runs every check and stages each version not yet on npm (`mise run publish:stage`). A maintainer releases it with `npm stage approve <stage-id>` and 2FA, core first. npm trusts that workflow, in the `npm` GitHub environment, to stage only, never to publish directly. `mise run publish:stage --dry-run` shows what would be staged.
 
 ## Agent skills
 

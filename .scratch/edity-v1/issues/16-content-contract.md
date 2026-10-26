@@ -1,6 +1,6 @@
 # 16. Content contract: vocabulary, fixtures and Go module
 
-Status: ready-for-agent
+Status: resolved
 Repo: RMYPG/edity
 Milestone: M3
 Blocked by: 03
@@ -15,7 +15,7 @@ In `contracts/`, publish the content contract both validators must follow (ADR-0
 - [x] Fixtures cover grapheme counting (emoji, combining accents), number ranges and decimals, List bounds, nesting, unknown Fields and wrong types
 - [x] `core` passes every fixture in CI
 - [x] Go is declared in `edity`'s `mise.toml` for the module's own tests
-- [ ] A tagged version can be fetched with `go get github.com/RMYPG/edity/contracts@vX.Y.Z`
+- [x] A tagged version can be fetched with `go get github.com/RMYPG/edity/contracts@vX.Y.Z`
 
 ## Comments
 
@@ -28,3 +28,5 @@ The fixtures follow the test suite format. `fixtures/keywords/` tests each keywo
 Left over: the last criterion needs this branch on `main` and a pushed `contracts/v0.1.0` tag. The steps are in `contracts/README.md` ("Releasing"). `mise run contracts:fetch --local v0.1.0` already fetches the committed HEAD with `go get` from a scratch clone tagged `contracts/v0.1.0`, the way the Go proxy would from GitHub, and loads its files in a scratch module. After the push, `mise run contracts:fetch v0.1.0` checks it through `proxy.golang.org`. Ticket 19 should count graphemes with `github.com/clipperhouse/uax29/v2`, not `rivo/uniseg`, which is on Unicode 15.0 and fails the Indic conjunct fixture.
 
 2026-10-26: `contract.test.ts` counts `x-edity-decimals` with core's exported `decimalPlaces()`, and its differential test also checks core's `violations()` on every page fixture's Drafts. `number()` now refuses a negative `min`, so `fixtures/pages/numbers.json` gives `sessions` a minimum of 1; the keyword fixtures still test negative numbers.
+
+2026-10-27: `contracts/v0.1.0` is pushed, on `332c0c6` (RMYPG/edity#1 merged into `main`). `mise run contracts:fetch v0.1.0` fetches it through `proxy.golang.org` with `go get` and loads its 2 meta-schemas and 8 fixture files (165 tests), so the last criterion is met.
