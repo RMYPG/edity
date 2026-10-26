@@ -97,6 +97,42 @@ for tarball in "$out"/*.tgz; do
 done
 '''
 
+[tasks."publish:stage"]
+description = "Stage on npm every package whose version isn't published yet, core first, for a maintainer to approve with `npm stage approve` and 2FA"
+usage = '''
+flag "--dry-run" help="Pack each package and report what npm would stage, without staging anything"
+'''
+depends = ["build"]
+shell = "bash -c"
+run = '''
+set -euo pipefail
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+dry_run=()
+if [ "${usage_dry_run:-false}" = true ]; then dry_run=(--dry-run); fi
+# Core first: @edity/astro depends on it, so approve it first too.
+for dir in packages/core packages/astro; do
+  name=$(node -p "require('./$dir/package.json').name")
+  version=$(node -p "require('./$dir/package.json').version")
+  if found=$(npm view "$name@$version" version 2>&1); then
+    echo "$name@$version is on npm already"
+    continue
+  elif ! grep -q E404 <<< "$found"; then
+    echo "$found" >&2
+    exit 1
+  fi
+  # npm packs a folder as it is, so it would ship astro's workspace:
+  # dependency on core. pnpm's tarball has the version instead, and npm
+  # stages that tarball's contents.
+  tarball=$(cd "$dir" && pnpm pack --json --pack-destination "$work" | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).filename")
+  unpacked="$work/$(basename "$tarball" .tgz)"
+  mkdir "$unpacked"
+  tar -xzf "$tarball" -C "$unpacked"
+  echo "Staging $name@$version"
+  (cd "$unpacked/package" && npm stage publish --provenance "${dry_run[@]}")
+done
+'''
+
 [tasks."contracts:fetch"]
 description = "Fetch a contracts version with `go get` in a scratch module and load its files: a pushed tag, or with --local the committed HEAD tagged in a scratch clone"
 usage = '''

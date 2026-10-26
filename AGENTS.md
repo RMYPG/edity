@@ -8,6 +8,10 @@ Every development tool is declared in `mise.toml` and run through mise (`mise in
 
 Inside the workspace, tsc and Vitest resolve `@edity/*` imports to each package's `src/` through the `@edity/source` export condition. Anything else (Node, an Astro build) reads `dist/`, so run `mise run build` first.
 
+## Releasing
+
+`@edity/core` and `@edity/astro` share one version. To release, bump `version` in both `packages/*/package.json` and merge to `main`. `.github/workflows/publish.yml` then runs every check and stages each version not yet on npm (`mise run publish:stage`). A maintainer releases it with `npm stage approve <stage-id>` and 2FA, core first. npm trusts that workflow to stage only, never to publish directly. `mise run publish:stage --dry-run` shows what would be staged.
+
 ## Agent skills
 
 ### Issue tracker
