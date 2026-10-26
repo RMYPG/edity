@@ -21,3 +21,11 @@ First split the GitHub App: create `edity-publisher-dev` (same permissions, no w
 ## Notes
 
 Needs [RMYPG/platform#42](https://github.com/RMYPG/platform/issues/42) done for `fisioindoor`'s hostname.
+
+## Comments
+
+2026-10-26: Ticket 27's workflow releases a Publish only if the `EDITY_PUBLISHER_LOGINS` repository variable lists the App's login. Add these to the steps:
+- On `fisioindoor`: `gh variable set EDITY_PUBLISHER_LOGINS --repo RMYPG/fisioindoor --body 'edity-publisher[bot]'`.
+- On `edity-sandbox`, once it moves to the dev App: change its value to `edity-publisher-dev[bot]`, or `edity-publisher[bot],edity-publisher-dev[bot]` while both Apps are installed.
+
+Ticket 34 replaces these manual steps with `platform` code.

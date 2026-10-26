@@ -24,3 +24,5 @@ Add a workflow to the Site template that runs the existing release logic automat
   - The trigger condition, with act against a stub `release.yml` (8 cases): Developer pushes, failed CI, pull requests, an unset variable and partial login matches release nothing.
   - The version step, on scratch git histories (7 cases).
 - **Left open:** the first criterion needs a real run. `workflow_run` only fires from `main`, so merge the sandbox PR, then run `gh variable set EDITY_PUBLISHER_LOGINS --repo RMYPG/edity-sandbox --body 'edity-publisher[bot]'`. After that, the first commit the App pushes to `main` should produce a tag and image. Ticket 28 changes the value to `edity-publisher-dev[bot]`.
+
+2026-10-26: `EDITY_PUBLISHER_LOGINS=edity-publisher[bot]` is already set on `edity-sandbox` (since 2026-10-25), so the `gh variable set` step above is done. What remains is to merge the sandbox PR and get a real Publish commit released. Setting the variable as code instead of by hand is ticket 34.
