@@ -1,4 +1,4 @@
-import edity, { type EdityOptions } from '@edity/astro';
+import type { EdityOptions } from '@edity/astro';
 import { build, type AstroIntegration } from 'astro';
 import {
   cp,
@@ -17,6 +17,7 @@ import {
   defaultServerConditions,
   type Plugin,
 } from 'vite';
+import { siteConfig } from './fixture/site-config.js';
 
 /** The fixture Site, which every test of the integration builds. */
 export const fixture = new URL('./fixture/', import.meta.url);
@@ -57,7 +58,7 @@ export interface BuiltSite {
  * Builds a copy of the fixture Site, with the integration read from source.
  * Each build gets its own copy under the fixture's `.builds/`, so builds can
  * run side by side and never touch the fixture's own `.astro/` or `dist/`.
- * The config repeats the fixture's `astro.config.mjs`.
+ * The config is the fixture's own (`siteConfig`).
  */
 export async function buildFixture(
   options: BuildOptions = {},
@@ -74,12 +75,14 @@ export async function buildFixture(
       },
     },
   };
+  const config = siteConfig(edityOptions);
   try {
     await build({
+      ...config,
       root,
       configFile: false,
       logLevel: 'silent',
-      integrations: [edity(edityOptions), injectRoutes],
+      integrations: [...config.integrations, injectRoutes],
       vite: { plugins: [fromSource] },
     });
   } catch (error) {

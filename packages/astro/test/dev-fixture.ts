@@ -1,4 +1,4 @@
-import edity, { type EdityOptions } from '@edity/astro';
+import type { EdityOptions } from '@edity/astro';
 import { dev } from 'astro';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -8,6 +8,7 @@ import {
   fromSource,
   type Edits,
 } from './build-fixture.js';
+import { siteConfig } from './fixture/site-config.js';
 
 export interface DevOptions extends EdityOptions {
   /** Changes to the copy's files before the server starts. */
@@ -35,6 +36,7 @@ export async function devFixture(options: DevOptions = {}): Promise<DevSite> {
   let server: Awaited<ReturnType<typeof dev>>;
   try {
     server = await dev({
+      ...siteConfig(edityOptions),
       root,
       configFile: false,
       logLevel: 'silent',
@@ -42,7 +44,6 @@ export async function devFixture(options: DevOptions = {}): Promise<DevSite> {
         host: '127.0.0.1',
         port: Number(process.env.EDITY_TEST_DEV_PORT ?? 0),
       },
-      integrations: [edity(edityOptions)],
       vite: { plugins: [fromSource] },
     });
   } catch (error) {
