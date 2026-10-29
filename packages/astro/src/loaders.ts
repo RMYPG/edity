@@ -9,6 +9,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isPageName, pageNames } from './pages.js';
+import { checkContentFormat } from './prettier.js';
 
 /**
  * The loader of a page's content collection, whose name is the page's:
@@ -26,7 +27,9 @@ import { isPageName, pageNames } from './pages.js';
  * with `fields`, like a lockfile: `astro dev` rewrites the file when it is
  * missing or stale, and `astro build`, `astro check` and `astro sync` fail
  * instead, so a stale file never reaches the server, which validates Changes
- * against it.
+ * against it. And it fails when the Site's Prettier would format the page's
+ * content otherwise than edity-server writes it on a Publish
+ * (`checkContentFormat`).
  *
  * Write the Field definitions in `src/content.config.ts`. A running `astro
  * dev` loads content again when that file changes, but not when a file it
@@ -52,6 +55,10 @@ export function edityPage<Fields extends AnyFieldDefinitions>(
         context,
         new URL(`${page}.schema.json`, content),
         fields,
+      );
+      await checkContentFormat(
+        context.config.root,
+        new URL(`${page}.json`, content),
       );
       await glob({ pattern: `${page}.json`, base: content }).load(context);
     },
