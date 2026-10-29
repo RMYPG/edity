@@ -2,20 +2,23 @@
 // on its own origin (ADR-0001). Everything that knows the API's routes and
 // bodies stays in this module.
 //
-// TODO(ticket 18): make these calls through the client generated from
-// edity-server's OpenAPI file, keeping the functions' signatures, and take
-// its request types in place of the ones here.
+// edity-server owns the API's OpenAPI file (N10), pinned in api/openapi.yaml,
+// and `mise run api:generate` writes its types to openapi.ts. Every call goes
+// through a client typed by them, and every body type here is theirs, so a
+// change to the file that breaks the Editor fails the type-check.
+import createClient from 'openapi-fetch';
 import type { Change } from './draft.js';
+import type { paths } from './openapi.js';
+
+/** The API, on the page's own origin. */
+const api = createClient<paths>();
+
+type SessionCall = paths['/_edity/api/session']['get'];
+type PublishCall = paths['/_edity/api/publish']['post'];
 
 /** The signed-in Client, as `GET /_edity/api/session` returns them. */
-export interface Session {
-  /** The Client's name. */
-  readonly name: string;
-  /** The Client's locale in Zitadel, such as `es` or `en-GB`. */
-  readonly locale: string;
-  /** The Site the session is for. */
-  readonly site: string;
-}
+export type Session =
+  SessionCall['responses'][200]['content']['application/json'];
 
 /** What the server says about the browser's session. */
 export type SessionResult =
@@ -30,45 +33,39 @@ export type SessionResult =
  * scoped to `/_edity/api` (A2), so only the server can tell. Never throws.
  */
 export async function getSession(): Promise<SessionResult> {
-  let response: Response;
+  let answer;
   try {
-    response = await fetch('/_edity/api/session', {
+    answer = await api.GET('/_edity/api/session', {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
     });
   } catch (error) {
+    // Unreachable, or a 2xx whose body is not JSON.
     return { status: 'unavailable', reason: String(error) };
   }
-  if (response.status === 401) return { status: 'signed-out' };
+  const { data, response } = answer;
+  // `satisfies` keeps each status the Editor tells apart in the file.
+  if (response.status === (401 satisfies keyof SessionCall['responses'])) {
+    return { status: 'signed-out' };
+  }
   if (!response.ok) {
     return { status: 'unavailable', reason: `HTTP ${response.status}` };
   }
-  const body: unknown = await response.json().catch(() => undefined);
-  if (!isSession(body)) {
+  if (!isSession(data)) {
     return { status: 'unavailable', reason: 'not a session' };
   }
-  return { status: 'signed-in', session: body };
+  return { status: 'signed-in', session: data };
 }
 
 /**
  * What `POST /_edity/api/publish` takes (P3): the page, and only the Draft's
  * Changes, each with its value before and after.
  */
-export interface PublishRequest {
-  /** The page's name: its content collection's. */
-  readonly page: string;
-  /** In the order the Client made them. */
-  readonly changes: readonly PublishedChange[];
-}
+export type PublishRequest =
+  PublishCall['requestBody']['content']['application/json'];
 
 /** One Change, as Publish sends it. */
-export interface PublishedChange {
-  /** A Field's or a List's content path, such as `hero.title` or `plans`. */
-  readonly path: string;
-  /** The value the Client changed, which the server checks for Conflicts (V2). */
-  readonly before: Change['before'];
-  readonly after: Change['after'];
-}
+export type PublishedChange = PublishRequest['changes'][number];
 
 /** What Publish sends for the Draft `changes` of `page`. */
 export function publishRequest(
@@ -85,9 +82,13 @@ export function publishRequest(
   };
 }
 
+/** Whether the session call's 200 answered a session, as the file says. */
 function isSession(body: unknown): body is Session {
   if (typeof body !== 'object' || body === null) return false;
-  const { name, locale, site } = body as Record<string, unknown>;
+  // Typed by Session's keys, so a key the file renames fails the type-check.
+  const { name, locale, site } = body as Partial<
+    Record<keyof Session, unknown>
+  >;
   return (
     typeof name === 'string' &&
     typeof locale === 'string' &&
