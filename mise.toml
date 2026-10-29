@@ -197,9 +197,60 @@ fi
 go list -m "$module"
 '''
 
+[tasks."api:pin"]
+description = "Pin edity-server's OpenAPI file at a commit, and generate the types of the Editor's API client from it"
+usage = '''
+arg "<commit>" help="The full sha of the edity-server commit, on its main branch"
+'''
+shell = "bash -c"
+run = '''
+set -euo pipefail
+commit=$usage_commit
+if ! [[ $commit =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Not a full commit sha: $commit. Give all 40 characters, as \`git rev-parse\` prints them." >&2
+  exit 1
+fi
+url="https://raw.githubusercontent.com/RMYPG/edity-server/$commit/api/openapi.yaml"
+file=packages/astro/api/openapi.yaml
+fetched=$(mktemp)
+trap 'rm -f "$fetched"' EXIT
+{
+  echo "# edity-server's api/openapi.yaml at commit $commit, which"
+  echo "# \`mise run api:pin\` fetched from $url."
+  echo "# Pin another commit with \`mise run api:pin <commit>\` rather than editing this file."
+  # The file as GitHub serves it, byte for byte.
+  node --input-type=module -e '
+    const response = await fetch(process.argv[1]);
+    if (!response.ok) {
+      console.error(`${process.argv[1]}: HTTP ${response.status}`);
+      process.exit(1);
+    }
+    process.stdout.write(Buffer.from(await response.arrayBuffer()));
+  ' "$url"
+} > "$fetched"
+mv "$fetched" "$file"
+echo "Pinned $file at $commit"
+mise run api:generate
+'''
+
+[tasks."api:generate"]
+description = "Generate the types of the Editor's API client from edity-server's pinned OpenAPI file"
+usage = '''
+flag "--check" help="Fail if the committed types are not the ones the OpenAPI file generates, instead of writing them"
+'''
+depends = ["deps"]
+shell = "bash -c"
+run = '''
+set -euo pipefail
+check=()
+if [ "${usage_check:-false}" = true ]; then check=(--check); fi
+node packages/astro/api/generate.ts "${check[@]}"
+'''
+
 [tasks.ci]
 description = "Run every check CI runs"
 depends = [
+  "api:generate --check",
   "format:check",
   "lint",
   "typecheck",

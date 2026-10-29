@@ -1,6 +1,6 @@
 # 04. Create the edity-sandbox Site
 
-Status: ready-for-agent
+Status: resolved
 Repo: RMYPG/edity-sandbox
 Milestone: M0
 
@@ -11,7 +11,7 @@ Create `RMYPG/edity-sandbox` from `static-astro-site-template`, so development c
 ## Acceptance criteria
 
 - [x] The repo exists and CI builds its image to GHCR
-- [ ] `release.yml` produces a `vX.Y.Z` tag and image
+- [x] `release.yml` produces a `vX.Y.Z` tag and image
 - [x] The page covers text, numbers, a simple List and a nested List
 
 ## Notes
@@ -29,3 +29,5 @@ Creating the repository is a GitHub action the Developer should confirm. Deploym
   - the brand shown twice, once inside a link, and text inside a link and a button;
   - a simple bullet List of services, and a List of plan cards that each hold a List of features.
 - **Open:** the release criterion. It needs that PR on `main` and a dispatch of the Release workflow, which [RMYPG/edity-sandbox#1](https://github.com/RMYPG/edity-sandbox/pull/1) (ticket 27) also changes. The Developer does that, so the Status stays as it is.
+
+2026-10-29: Dispatched the Release workflow on `main` ([run 40863998895](https://github.com/RMYPG/edity-sandbox/actions/runs/40863998895)). It tagged `31077c3` (RMYPG/edity-sandbox#3, which takes `@edity/*` 0.1.0 from npm) as `v1.0.0` and promoted its `sha-` image to `ghcr.io/rmypg/edity-sandbox:v1.0.0`, so the last criterion is met.

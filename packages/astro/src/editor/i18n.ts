@@ -33,6 +33,13 @@ export interface Messages {
   limit(count: Count): string;
   /** A counter on a Field that broke the Limit as published (L7). */
   published(limit: string): string;
+  /**
+   * A Publish whose Release failed after its commit (P5): the changes are
+   * saved, not live yet, and the Developer has been notified. The server
+   * answers `failed` only once an issue on the Site repository tells the
+   * Developer (V6).
+   */
+  readonly releaseFailed: string;
   /** The List controls' text. */
   readonly lists: ListMessages;
 }
@@ -85,6 +92,8 @@ const messages: Readonly<Record<Locale, Messages>> = {
       }
     },
     published: (limit) => `${limit} · ya publicado así`,
+    releaseFailed:
+      'Tus cambios están guardados, pero aún no se ven en la web: algo ha fallado por el camino. Ya se ha avisado a quien mantiene tu web.',
     lists: listMessages.es,
   },
   en: {
@@ -129,6 +138,8 @@ const messages: Readonly<Record<Locale, Messages>> = {
       }
     },
     published: (limit) => `${limit} · already published`,
+    releaseFailed:
+      'Your changes are saved, but they are not live yet: something went wrong on the way. Your developer has been notified.',
     lists: listMessages.en,
   },
 };

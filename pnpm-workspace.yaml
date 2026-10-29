@@ -14,3 +14,9 @@ minimumReleaseAge: 4320 # 3 days
 #   - package-with-critical-hotfix@1.2.3
 
 trustPolicy: no-downgrade
+
+peerDependencyRules:
+  allowedVersions:
+    # It asks for TypeScript 5, and generates the Editor's API types with 6
+    # just as well (`mise run api:generate`).
+    openapi-typescript>typescript: '6'

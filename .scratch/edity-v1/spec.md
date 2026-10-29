@@ -220,7 +220,7 @@ On hold: the platform's deployment model is changing, so work focuses on the app
 | Will Clients edit from a phone? | Yes, occasionally |
 | Editor UI library | Preact 11 with signals, rendered into one shadow root |
 | npm scope | `@edity` if the npm org can be created, otherwise `@rmypg/edity-*` |
-| Licenses | MPL-2.0 for `edity` and its packages, AGPL-3.0 for `edity-server` |
+| Licenses | MPL-2.0 for `edity` and its packages, AGPL-3.0 for `edity-server` except its OpenAPI file, which the Editor's client is generated from and is MPL-2.0 (ADR-0006) |
 | GitHub Apps | One: `edity-publisher`, installed on Site repositories (contents write, issues write, actions, checks and metadata read), with no webhook in v1: progress is polled, which keeps the server stateless and needs no public URL |
 
 ## Deferred backlog

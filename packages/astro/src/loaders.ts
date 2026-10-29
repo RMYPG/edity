@@ -8,6 +8,8 @@ import { glob, type Loader, type LoaderContext } from 'astro/loaders';
 import { readFile, writeFile } from 'node:fs/promises';
 import { relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isPageName, pageNames } from './pages.js';
+import { checkContentFormat } from './prettier.js';
 
 /**
  * The loader of a page's content collection, whose name is the page's:
@@ -19,12 +21,15 @@ import { fileURLToPath } from 'node:url';
  * ```
  *
  * It loads the page's content from `src/content/<page>.json`, as one entry
- * with the page's name as its id, and checks it against `fields`. It also
+ * with the page's name as its id, and checks it against `fields`. It fails
+ * for a page whose name edity-server would refuse (`isPageName`). It also
  * keeps the page's JSON Schema, `src/content/<page>.schema.json`, in step
  * with `fields`, like a lockfile: `astro dev` rewrites the file when it is
  * missing or stale, and `astro build`, `astro check` and `astro sync` fail
  * instead, so a stale file never reaches the server, which validates Changes
- * against it.
+ * against it. And it fails when the Site's Prettier would format the page's
+ * content otherwise than edity-server writes it on a Publish
+ * (`checkContentFormat`).
  *
  * Write the Field definitions in `src/content.config.ts`. A running `astro
  * dev` loads content again when that file changes, but not when a file it
@@ -40,10 +45,20 @@ export function edityPage<Fields extends AnyFieldDefinitions>(
     async load(context) {
       const content = new URL('content/', context.config.srcDir);
       const page = context.collection;
+      if (!isPageName(page)) {
+        throw new AstroError(
+          `"${page}" cannot be the name of a page: edity-server takes only ${pageNames}.`,
+          `Rename the content collection "${page}" in src/content.config.ts, and its files in src/content/.`,
+        );
+      }
       await syncSchemaFile(
         context,
         new URL(`${page}.schema.json`, content),
         fields,
+      );
+      await checkContentFormat(
+        context.config.root,
+        new URL(`${page}.json`, content),
       );
       await glob({ pattern: `${page}.json`, base: content }).load(context);
     },
