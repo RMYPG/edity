@@ -35,7 +35,7 @@ Login is ticket 25; until then, a development-only stub identity is fine.
 - **Checked:**
   - Every status goes through `apitest.Handler` against `api/openapi.yaml`, so the 422 body is checked against the file (ticket 19).
   - Tests cover `main` moving once (one commit on the new HEAD, Conflicts worked out again) and moving every time (503, no commit), a spurious STALE_DATA, and uncertain failures whether the commit landed or not.
-  - `mise run check:sandbox` (build tag `sandbox`, not in CI) published twice on edity-sandbox, with the `dev` credentials through `infisical run`:
+  - `mise run check:sandbox` (build tag `sandbox`, not in CI) published twice on edity-sandbox, with the `dev` credentials through `infisical run`. It calls the Publish code (`publish.New`) directly, as the Developer chose: the HTTP route answers 401 to every real request until ticket 25, and its tests cover it through `apitest.Handler`. What it did:
     - `4bc9310` changed `hero.cta` and was released as `v1.0.1`.
     - `f50d2c4` put it back and was released as `v1.0.2`.
     - For each commit it confirmed the author `edity-publisher[bot]` with a verified signature, the HEAD read as its only parent, the trailer, only the two files changed, the sandbox's CI green (`prettier --check` included), and the tag from Release on Publish.

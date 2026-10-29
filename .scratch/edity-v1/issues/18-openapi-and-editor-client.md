@@ -24,10 +24,12 @@ Describe the API from the spec's API section in OpenAPI 3.1 in `edity-server`. G
   - Added beyond the table: 400 for a malformed Publish body, 403 from the `Origin` check (A4), 429 with `Retry-After` (V5), and 404 for an unknown host or sha.
   - Settled ahead of ticket 25, which can change them: the `edity_session` cookie, 302 to Zitadel, 303 back from the callback, and a `return` parameter on `/_edity/login` that brings the Client back to their page (A3).
   - vacuum 0.35.7 lints it in `mise run lint`.
-- **Server tests:** `internal/apitest` wraps a handler in tests and fails on any response, or any answer to a request, that the file doesn't describe. The route tests read the routes from the file. Tickets 20, 22 and 25 test their handlers through it.
+- **Server tests:** `internal/apitest` wraps a handler in tests and fails on any response, or any answer to a request, that the file doesn't describe. The route tests read the routes from the file. Tickets 20 and 22 test their handlers through it, and ticket 25 will.
 - **The client:** `packages/astro/api/openapi.yaml` is the file pinned at an edity-server commit, and `mise run api:pin <sha>` re-pins it. `mise run api:generate` writes `src/editor/openapi.ts` with openapi-typescript 7.13 (`--immutable`), through `api/generate.ts`, which works around its unresolvable recursive `ContentValue` array (TS2502).
   - `api.ts` calls the server through openapi-fetch 0.17 (2.3 KB gzipped on the Editor bundle) and takes `Session`, `PublishRequest` and `PublishedChange` from the generated types, by route.
 - **Checked:**
   - `mise run ci` runs `api:generate --check` and the type-check. Renaming `Session.name`, dropping the session's 401 and renaming `Change.path` in the pinned file each failed it.
   - The page loader also fails the build for a page whose name the file's pattern refuses.
-- **Left over:** the pin is edity-server's PR branch at `eedb515`. Re-pin to `main` with `mise run api:pin` once that PR merges.
+- **Left over:**
+  - The pin is a commit of edity-server's PR branch. That repository squash-merges, so re-pin to the merged commit on `main` with `mise run api:pin` once the PR merges.
+  - edity's CI sees the server's file only at its pin. A change on edity-server's side that breaks the Editor reaches edity's CI only at the next re-pin; ticket 24's Pact tests are what catch it in edity-server's CI.
