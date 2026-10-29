@@ -4,8 +4,8 @@
 //
 // edity-server owns the API's OpenAPI file (N10), pinned in api/openapi.yaml,
 // and `mise run api:generate` writes its types to openapi.ts. Every call goes
-// through a client typed by them, and every body type here is theirs, so a
-// change to the file that breaks the Editor fails the type-check.
+// through an API client typed by them, and every body type here is theirs,
+// so a change to the file that breaks the Editor fails the type-check.
 import createClient from 'openapi-fetch';
 import type { Change } from './draft.js';
 import type { paths } from './openapi.js';
