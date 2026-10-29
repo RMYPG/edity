@@ -111,6 +111,12 @@ export interface paths {
          *     Changes that merge become one commit on top of that HEAD, with a patch
          *     bump of the Site's `package.json`, which a workflow in the Site
          *     repository then cuts as a Release (V3).
+         *
+         *     The Release ships everything on `main`. Once it has answered, the
+         *     server notes on an issue of the Site repository the commits since the
+         *     last Release that the edity-publisher GitHub App did not make and that
+         *     change more than content (V7). Noting them never delays or fails the
+         *     Publish.
          */
         readonly post: operations["publish"];
         readonly delete?: never;
@@ -136,6 +142,10 @@ export interface paths {
          *
          *     Requests for the same commit within 5 seconds get the same answer, so
          *     polling more often than that tells nothing more.
+         *
+         *     The server answers `failed` only once an issue on the Site repository
+         *     tells the Developer what failed (V6), so the Editor can tell the
+         *     Client that the Developer has been notified (P5).
          */
         readonly get: operations["getPublishStatus"];
         readonly put?: never;
@@ -281,8 +291,10 @@ export interface components {
              *       time: no CI run 10 minutes after the commit, or no Release 30
              *       minutes after CI passed while no Release run of it is under
              *       way. The changes are saved but not live, and the Developer has
-             *       been told (P5, V6). It is not the end: a newer Release that
-             *       contains the commit makes it `released`.
+             *       been told: an issue on the Site repository says what failed and
+             *       links to the run (P5, V6). The server answers `failed` only once
+             *       that issue is written, and 503 until then. It is not the end: a
+             *       newer Release that contains the commit makes it `released`.
              * @enum {string}
              */
             readonly stage: "validating" | "releasing" | "released" | "deploying" | "live" | "failed";
@@ -733,7 +745,9 @@ export interface operations {
             };
             /**
              * @description The edity-publisher GitHub App is not installed on the Site
-             *     repository, or lacks a permission. The Developer has to fix it.
+             *     repository, or lacks a permission, or the repository's Issues are
+             *     turned off, so a failed Release can't be told to the Developer.
+             *     The Developer has to fix it.
              */
             readonly 500: {
                 headers: {
@@ -745,8 +759,9 @@ export interface operations {
             };
             /**
              * @description GitHub could not be reached or is limiting the server's requests,
-             *     so the progress is not known for now. The Editor asks again
-             *     later.
+             *     so the progress is not known for now, or the Release failed and
+             *     the issue that tells the Developer is not written yet (P5). The
+             *     Editor asks again later.
              */
             readonly 503: {
                 headers: {

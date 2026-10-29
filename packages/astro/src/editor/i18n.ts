@@ -93,7 +93,7 @@ const messages: Readonly<Record<Locale, Messages>> = {
     },
     published: (limit) => `${limit} · ya publicado así`,
     releaseFailed:
-      'Tus cambios están guardados, pero aún no se ven en la web: algo ha fallado por el camino. Ya se ha avisado a tu desarrollador.',
+      'Tus cambios están guardados, pero aún no se ven en la web: algo ha fallado por el camino. Ya se ha avisado a quien mantiene tu web.',
     lists: listMessages.es,
   },
   en: {
