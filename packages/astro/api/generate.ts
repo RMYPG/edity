@@ -18,8 +18,11 @@ const header = `/**
 
 `;
 
-/** The interfaces that arrays of the schema they sit in refer to, by name. */
-const arrays = new Map<string, ts.InterfaceDeclaration>();
+/**
+ * The names of the interfaces written into the file's footer so far, one
+ * for each schema that holds arrays of itself, which those arrays refer to.
+ */
+const arrayInterfaces = new Set<string>();
 
 const types = await openapiTS(input, {
   // Readonly, as the Editor's own types are.
@@ -33,39 +36,42 @@ const types = await openapiTS(input, {
     if (!items || !('$ref' in items)) return;
     if (!path?.startsWith(`${items.$ref}/`)) return;
     const name = `${items.$ref.split('/').at(-1)}Array`;
-    if (!arrays.has(name)) {
-      const array = ts.factory.createInterfaceDeclaration(
-        [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
-        name,
-        undefined,
-        [
-          ts.factory.createHeritageClause(ts.SyntaxKind.ExtendsKeyword, [
-            ts.factory.createExpressionWithTypeArguments(
-              ts.factory.createIdentifier('ReadonlyArray'),
-              [oapiRef(items.$ref)],
-            ),
-          ]),
-        ],
-        [],
+    if (!arrayInterfaces.has(name)) {
+      arrayInterfaces.add(name);
+      ctx.injectFooter.push(
+        ts.factory.createInterfaceDeclaration(
+          [ts.factory.createModifier(ts.SyntaxKind.ExportKeyword)],
+          name,
+          undefined,
+          [
+            ts.factory.createHeritageClause(ts.SyntaxKind.ExtendsKeyword, [
+              ts.factory.createExpressionWithTypeArguments(
+                ts.factory.createIdentifier('ReadonlyArray'),
+                [oapiRef(items.$ref)],
+              ),
+            ]),
+          ],
+          [],
+        ),
       );
-      arrays.set(name, array);
-      ctx.injectFooter.push(array);
     }
     return ts.factory.createTypeReferenceNode(name);
   },
 });
 const generated = header + astToString(types);
 
-const name = relative(process.cwd(), fileURLToPath(output));
+/** The file at `url`, as a path from the working directory. */
+const shown = (url: URL) => relative(process.cwd(), fileURLToPath(url));
+
 if (process.argv.includes('--check')) {
   const committed = await readFile(output, 'utf8').catch(() => undefined);
   if (committed !== generated) {
     console.error(
-      `${name} is not what ${relative(process.cwd(), fileURLToPath(input))} generates. Run \`mise run api:generate\`, then commit it.`,
+      `${shown(output)} is not what ${shown(input)} generates. Run \`mise run api:generate\`, then commit it.`,
     );
     process.exitCode = 1;
   }
 } else {
   await writeFile(output, generated);
-  console.log(`Wrote ${name}`);
+  console.log(`Wrote ${shown(output)}`);
 }
