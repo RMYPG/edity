@@ -39,6 +39,8 @@ V7 (non-content commits) is a Should.
   - Removing the lock or the skip of pull requests fails them.
   - The P5 and V7 tests check that `failed` waits for the issue and that a Publish's 202 doesn't wait for the V7 note.
 - **Left over:**
-  - The issue opens only while something asks for the Publish's status: a Client who closes the tab leaves it unopened until the Editor polls again. The recommendation is a sweep every 5 minutes per Site that asks for the progress of every App commit since the last Release, which reuses the duplicate checks as they are.
+  - ~~The issue opens only while something asks for the Publish's status.~~ Fixed after review, below.
   - A comment that GitHub created but whose answer was lost is written again once.
   - A V7 note is lost if the server stops while it runs.
+
+2026-10-29, after the code review: **a sweep per Site** now tells the Developer of a failed Release even when no Client asks (V6 is a Must, and a Client usually closes the tab). Every 5 minutes, one Site after another, it asks the progress of the App's newest 10 commits on `main` since the last Release, and the Reporter tells what failed with its duplicate checks as they are. It stores nothing, uses the ETag cache, and stops with the server. `TestSweepingStaysWithinTheRateLimit` measures a Site with nothing since its last Release at 25 calls an hour, 5 of them counted, and a Site with a Publish under way all hour at 85, 13 counted. The Client's message is still shown only once ticket 26 wires Publish.

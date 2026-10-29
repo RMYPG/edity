@@ -42,6 +42,11 @@ Login is ticket 25; until then, a development-only stub identity is fine.
     - A stale `before` got 409 and a broken Limit 422, both leaving `main` unmoved.
     - After the round trip `home.json` is byte for byte the original.
 - **Left over:**
-  - An uncertain commit that lands without GitHub saying so, with someone pushing on top before the next read, is answered as a Conflict instead of a success.
+  - ~~An uncertain commit that lands without GitHub saying so, with someone pushing on top before the next read, is answered as a Conflict instead of a success.~~ Fixed after review, below.
   - Only this route checks `Origin` so far; ticket 25 adds it to the others.
   - A content file whose objects were written collapsed gets them expanded on its first Publish, which still passes Prettier.
+
+2026-10-29, after the code review (RMYPG/edity-server#3 and RMYPG/edity#3):
+- **Already published (the Developer's decision):** a Change whose stored value already equals its `after` is no Conflict and has nothing to commit, whatever its `before`. When every Change is like that, the answer is 202 with the newest App commit that changed `src/content/<page>.json` and the version at that commit. So a Client who presses Publish again after a 202 that never reached the browser sees their Publish's progress, not Conflicts on their own Changes, and so does the uncertain-commit case above.
+- **Origin (A4):** `https://` and one of the Site's hostnames, on any port; `http://` only for a loopback hostname such as `localhost`. Before, it took the scheme from the request, which is `http` behind Cloudflare Tunnel.
+- **Prettier (N3):** edity-server writes content with Prettier 3.9's defaults for JSON. `@edity/astro`'s page loader now fails the Site's build when the Site's own Prettier config for the content file (`.prettierrc`, overrides, `.editorconfig`) or its Prettier version would format it differently, so a Developer's config change or a Prettier upgrade fails on their own commit, not on every Publish after it. edity-server's README, "Content files and Prettier", says what a Site keeps and how to move to another Prettier.
