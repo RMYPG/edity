@@ -1,5 +1,5 @@
-# edity-server's api/openapi.yaml at commit c0810ee5b4f7520c86318030f9d4349bdb9f92fe, which
-# `mise run api:pin` fetched from https://raw.githubusercontent.com/RMYPG/edity-server/c0810ee5b4f7520c86318030f9d4349bdb9f92fe/api/openapi.yaml.
+# edity-server's api/openapi.yaml at commit 8aa3d80e773369f0c0c5b7d163a8a7afe08cf226, which
+# `mise run api:pin` fetched from https://raw.githubusercontent.com/RMYPG/edity-server/8aa3d80e773369f0c0c5b7d163a8a7afe08cf226/api/openapi.yaml.
 # Pin another commit with `mise run api:pin <commit>` rather than editing this file.
 # This Source Code Form is subject to the terms of the Mozilla Public
 # License, v. 2.0. If a copy of the MPL was not distributed with this
