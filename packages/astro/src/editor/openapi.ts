@@ -129,8 +129,13 @@ export interface paths {
         /**
          * Progress of a Publish
          * @description Where the Release of a Publish's commit is (P4). The server works it
-         *     out from GitHub on each request, and stores nothing (V8). A commit
-         *     counts as live once the Site runs its Release or a newer one (P8).
+         *     out from GitHub on each request, and stores nothing (V8), so the
+         *     progress survives a reload and a restart of the server. A commit
+         *     counts as released once its Release or a newer one contains it, and
+         *     will count as live once the Site runs one of them (P8).
+         *
+         *     Requests for the same commit within 5 seconds get the same answer, so
+         *     polling more often than that tells nothing more.
          */
         readonly get: operations["getPublishStatus"];
         readonly put?: never;
@@ -260,17 +265,24 @@ export interface components {
         /** @description Where the Release of a Publish's commit is (P4). */
         readonly PublishStatus: {
             /**
-             * @description - `validating`: the Site's CI runs on the commit.
-             *     - `releasing`: CI passed, and the Release is being cut: its
-             *       `v<version>` tag or its image does not exist yet.
-             *     - `released`: the Release exists.
+             * @description - `validating`: the Site's CI runs on the commit, or is about to.
+             *     - `releasing`: CI passed, and the Release is being cut: no
+             *       `v<version>` tag contains the commit yet. The tag is pushed only
+             *       once its image exists.
+             *     - `released`: the commit's Release exists, or a newer one that
+             *       contains the commit (P8), even if the commit's own CI or
+             *       Release failed.
              *     - `deploying`: the Release is being deployed. On hold, not
              *       reported yet (ticket 33).
              *     - `live`: the Site runs the Release or a newer one (P8). On hold,
              *       not reported yet (ticket 33).
-             *     - `failed`: a check on the commit failed, or cutting the Release
-             *       did. The changes are saved but not live, and the Developer has
-             *       been told (P5, V6).
+             *     - `failed`: a CI run on the commit failed, or the Release on
+             *       Publish run that cuts its Release did, or nothing came of it in
+             *       time: no CI run 10 minutes after the commit, or no Release 30
+             *       minutes after CI passed while no Release run of it is under
+             *       way. The changes are saved but not live, and the Developer has
+             *       been told (P5, V6). It is not the end: a newer Release that
+             *       contains the commit makes it `released`.
              * @enum {string}
              */
             readonly stage: "validating" | "releasing" | "released" | "deploying" | "live" | "failed";
@@ -707,11 +719,39 @@ export interface operations {
             readonly 401: components["responses"]["NoSession"];
             readonly 403: components["responses"]["ForeignOrigin"];
             /**
-             * @description The hostname is not one of a configured Site's, or `sha` is not a
-             *     commit of the Site's repository.
+             * @description The hostname is not one of a configured Site's, or `sha` is not
+             *     the commit of a Publish on the Site: the Site repository has no
+             *     such commit, or the edity-publisher GitHub App did not author it.
              */
             readonly 404: {
                 headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/plain": components["schemas"]["Message"];
+                };
+            };
+            /**
+             * @description The edity-publisher GitHub App is not installed on the Site
+             *     repository, or lacks a permission. The Developer has to fix it.
+             */
+            readonly 500: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/plain": components["schemas"]["Message"];
+                };
+            };
+            /**
+             * @description GitHub could not be reached or is limiting the server's requests,
+             *     so the progress is not known for now. The Editor asks again
+             *     later.
+             */
+            readonly 503: {
+                headers: {
+                    /** @description How many seconds to wait before asking again, when the server knows. */
+                    readonly "Retry-After"?: number;
                     readonly [name: string]: unknown;
                 };
                 content: {
