@@ -35,7 +35,7 @@ export interface paths {
         };
         /**
          * Finish logging in
-         * @description Where Zitadel sends the browser back after a login. When the user has
+         * @description Where Zitadel sends the browser back after a login. When the Client has
          *     the Site's role (`zitadelRole` in the Sites file), it sets the session
          *     cookie and the `edity=1` marker and goes back to the path the login
          *     was asked to `return` to (A1). The browser navigates here; the Editor
@@ -107,16 +107,18 @@ export interface paths {
          * @description Publishes the Changes of a Draft on one page (P3). The server reads
          *     the page's content and Field definitions from the Site repository at
          *     `main` HEAD, and validates the Changes against them (V1). A Change
-         *     whose stored value is no longer its `before` is a Conflict (V2). The
-         *     Changes that merge become one commit on top of that HEAD, with a patch
-         *     bump of the Site's `package.json`, which a workflow in the Site
-         *     repository then cuts as a Release (V3).
+         *     whose stored value is no longer its `before` is a Conflict (V2),
+         *     unless the stored value is its `after` already: that Change is
+         *     already published, whatever its `before`, and has nothing to commit.
+         *     The Changes that merge become one commit on top of that HEAD, with a
+         *     patch bump of the Site's `package.json`, which a workflow in the
+         *     Site repository then cuts as a Release (V3).
          *
          *     The Release ships everything on `main`. Once it has answered, the
-         *     server notes on an issue of the Site repository the commits since the
-         *     last Release that the edity-publisher GitHub App did not make and that
-         *     change more than content (V7). Noting them never delays or fails the
-         *     Publish.
+         *     server reports on an issue of the Site repository the commits since
+         *     the last Release that the edity-publisher GitHub App did not make and
+         *     that change more than content (V7). Reporting them never delays or
+         *     fails the Publish.
          */
         readonly post: operations["publish"];
         readonly delete?: never;
@@ -213,7 +215,7 @@ export interface components {
         readonly ContentValue: string | number | ContentValueArray | {
             readonly [key: string]: components["schemas"]["ContentValue"];
         };
-        /** @description A Publish that was committed. */
+        /** @description A Publish that was committed, or, when every Change was already published, the page's last Publish. */
         readonly Published: {
             /** @description The commit's sha, to follow its progress with `getPublishStatus`. */
             readonly sha: components["schemas"]["Sha"];
@@ -224,7 +226,7 @@ export interface components {
         };
         /** @description A Publish in which nothing merged. */
         readonly Conflicts: {
-            /** @description Every Change of the Publish. */
+            /** @description Every Change of the Publish that is a Conflict, which is all of them but those already published. */
             readonly conflicts: readonly components["schemas"]["Conflict"][];
         };
         /**
@@ -237,23 +239,25 @@ export interface components {
         };
         /** @description A Publish that breaks the page's Field definitions. */
         readonly Violations: {
-            /** @description Every Limit the Changes break. */
+            /** @description Everything the Changes break of the page's Field definitions. */
             readonly violations: readonly components["schemas"]["Violation"][];
         };
         /**
-         * @description A rule of the page's Field definitions that a Change breaks, as the
-         *     Editor's `Violation` names it, so the Editor shows the server's
-         *     verdicts as it shows its own.
+         * @description What a Change breaks of the page's Field definitions, named as
+         *     `@edity/core`'s `Violation` names it in its `rule`, so the Editor
+         *     shows the server's verdicts as it shows its own.
          */
         readonly Violation: {
             /**
-             * @description The content path of the value that breaks the rule: the Change's,
+             * @description The content path of the value that breaks it: the Change's,
              *     or one inside it, such as `plans.1.features` inside a Change to
              *     `plans`.
              */
             readonly path: components["schemas"]["ContentPath"];
             /**
-             * @description The rule it breaks:
+             * @description What the value breaks: one of the Limits of its Field or List,
+             *     or, for `type`, `unknown` and `oneLine`, what the Field
+             *     definitions hold whatever their Limits.
              *
              *     - `type`: not what the Field definitions hold there: text, a
              *       number, a List's Items or an Item's Fields.
@@ -289,8 +293,10 @@ export interface components {
              *     - `failed`: a CI run on the commit failed, or the Release on
              *       Publish run that cuts its Release did, or nothing came of it in
              *       time: no CI run 10 minutes after the commit, or no Release 30
-             *       minutes after CI passed while no Release run of it is under
-             *       way. The changes are saved but not live, and the Developer has
+             *       minutes after CI passed while no Release on Publish run is
+             *       under way, on a Site whose Release on Publish runs are named
+             *       after their commits. A CI run that waits for a runner keeps the
+             *       commit `validating`. The changes are saved but not live, and the Developer has
              *       been told: an issue on the Site repository says what failed and
              *       links to the run (P5, V6). The server answers `failed` only once
              *       that issue is written, and 503 until then. It is not the end: a
@@ -326,8 +332,8 @@ export interface components {
             };
         };
         /**
-         * @description The request's `Origin` is not the Site's own, or it is a `POST`
-         *     without an `Origin` (A4).
+         * @description The request's `Origin` is not one of the Site's own, or it is a
+         *     `POST` without an `Origin` (A4).
          */
         readonly ForeignOrigin: {
             headers: {
@@ -393,7 +399,7 @@ export interface operations {
                 readonly code?: string;
                 /** @description The login's state, which ties this callback to the login this browser started. */
                 readonly state?: string;
-                /** @description Zitadel's OAuth 2.0 error code, when the login failed or the user cancelled it. */
+                /** @description Zitadel's OAuth 2.0 error code, when the login failed or the Client cancelled it. */
                 readonly error?: string;
                 /** @description Zitadel's description of the error. */
                 readonly error_description?: string;
@@ -432,7 +438,7 @@ export interface operations {
                     readonly "text/plain": components["schemas"]["Message"];
                 };
             };
-            /** @description The user logged in, but does not have the Site's role. No session (A1). */
+            /** @description The person who logged in does not have the Site's role, so is not one of its Clients. No session (A1). */
             readonly 403: {
                 headers: {
                     readonly [name: string]: unknown;
@@ -544,8 +550,18 @@ export interface operations {
         readonly responses: {
             /**
              * @description Committed. Every Change merged but those in `conflicts`, which the
-             *     Editor keeps in the Draft. The commit becomes a Release once the
-             *     Site's CI passes on it (ADR-0003).
+             *     Editor keeps in the Draft, and those already published, which are
+             *     neither in `conflicts` nor in the commit. The commit becomes a
+             *     Release once the Site's CI passes on it (ADR-0003).
+             *
+             *     When every Change is already published, as when the Client
+             *     publishes again a Draft whose answer they missed, nothing is
+             *     committed, and `sha` and `version` are the page's last Publish:
+             *     the newest commit on `main` that the edity-publisher GitHub App
+             *     made to the page's content, at its version, which the Editor
+             *     follows as its own. When the App made none, the Changes are
+             *     answered as though none were already published: each merges, or
+             *     is a Conflict when the stored value is not its `before`.
              */
             readonly 202: {
                 headers: {
@@ -584,8 +600,9 @@ export interface operations {
             readonly 403: components["responses"]["ForeignOrigin"];
             readonly 404: components["responses"]["UnknownSite"];
             /**
-             * @description Every Change is a Conflict, so nothing merged and nothing was
-             *     committed (V2).
+             * @description Nothing merged, so nothing was committed: every Change is a
+             *     Conflict (V2), or already published. `conflicts` lists the
+             *     Conflicts alone.
              */
             readonly 409: {
                 headers: {
