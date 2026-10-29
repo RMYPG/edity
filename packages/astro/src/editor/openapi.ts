@@ -543,8 +543,10 @@ export interface operations {
                 };
             };
             /**
-             * @description Not a Publish: the body is not JSON, or not of the shape of
-             *     `PublishRequest`. Nothing was committed.
+             * @description Not a Publish: the body is not JSON sent as `application/json`,
+             *     or not of the shape of `PublishRequest`, or two of its Changes
+             *     are for one Field or List, or one is inside the other's, which
+             *     the Editor never sends. Nothing was committed.
              */
             readonly 400: {
                 headers: {
@@ -582,10 +584,25 @@ export interface operations {
                 };
             };
             /**
+             * @description The body is larger than a Publish can be, a mebibyte. Nothing
+             *     was committed.
+             */
+            readonly 413: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/plain": components["schemas"]["Message"];
+                };
+            };
+            /**
              * @description Some Change breaks the page's Field definitions at `main` HEAD, or
              *     is not for one of its Fields or Lists (V1). A page with no content
              *     at `main` HEAD has neither, so each of its Changes is `unknown`.
-             *     Nothing was committed.
+             *     The content the Changes that merge would make must pass the
+             *     Field definitions as a whole, so a violation can also be where no
+             *     Change is, in content already on `main` (N3). Nothing was
+             *     committed.
              */
             readonly 422: {
                 headers: {
@@ -617,6 +634,38 @@ export interface operations {
                 headers: {
                     /** @description How many seconds to wait before the Site can publish again. */
                     readonly "Retry-After": number;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/plain": components["schemas"]["Message"];
+                };
+            };
+            /**
+             * @description The Site repository can't be published as it is: its content or
+             *     Field definitions at `main` HEAD can't be read, its
+             *     `package.json` has no `X.Y.Z` version to bump, or the
+             *     edity-publisher GitHub App is not installed on it or lacks a
+             *     permission. Nothing was committed, and the Developer has to fix
+             *     the repository.
+             */
+            readonly 500: {
+                headers: {
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/plain": components["schemas"]["Message"];
+                };
+            };
+            /**
+             * @description The Publish did not go through for now: GitHub could not be
+             *     reached or is limiting the server's requests, or `main` kept
+             *     moving while the server committed. The Client can publish again
+             *     later.
+             */
+            readonly 503: {
+                headers: {
+                    /** @description How many seconds to wait before publishing again, when the server knows. */
+                    readonly "Retry-After"?: number;
                     readonly [name: string]: unknown;
                 };
                 content: {
