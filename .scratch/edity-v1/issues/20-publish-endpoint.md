@@ -1,6 +1,6 @@
 # 20. Publish endpoint
 
-Status: ready-for-agent
+Status: resolved
 Repo: RMYPG/edity-server
 Milestone: M4
 Blocked by: 04, 19, 21
@@ -12,10 +12,36 @@ Implement `POST /_edity/api/publish`. As the `edity-publisher` GitHub App: read 
 
 ## Acceptance criteria
 
-- [ ] Returns `202 { sha, version, conflicts? }`, `409`, `422` or `401` as in the spec
-- [ ] If `main` moves between read and commit, the commit is retried or rejected, never written on a stale base
-- [ ] Works end to end against `edity-sandbox`
+- [x] Returns `202 { sha, version, conflicts? }`, `409`, `422` or `401` as in the spec
+- [x] If `main` moves between read and commit, the commit is retried or rejected, never written on a stale base
+- [x] Works end to end against `edity-sandbox`
 
 ## Notes
 
 Login is ticket 25; until then, a development-only stub identity is fine.
+
+## Comments
+
+2026-10-29: Built in [RMYPG/edity-server#3](https://github.com/RMYPG/edity-server/pull/3), with the standard library only (`encoding/json/v2` and `jsontext` from Go 1.27).
+- **`internal/content`** reads a content file with its key order and the original text of every value, applies Changes by path, and writes the file exactly as Prettier 3.9 formats JSON. Line width is a port of Prettier's `getStringWidth`, generated from Prettier's own bundle (`emoji.mjs`). `testdata/prettier.json` holds Prettier's answers on 780 files, 9k texts and 900 numbers, and the Go tests match them all.
+- **`internal/github`** calls GitHub as `edity-publisher`: an RS256 JWT, the installation of each repository, and a token scoped to that repository, cached until 5 minutes before it expires. It commits with GraphQL `createCommitOnBranch` and `expectedHeadOid`, so the HEAD check and the commit are one step on GitHub's side.
+- **`internal/publish`** reads the content, the page's schema and `package.json` at `main` HEAD.
+  - A Change whose stored value isn't its `before`, or whose Field or Item is gone, is a Conflict, even when the stored value already equals `after` (V2). A path that is neither a Field nor a List is a violation, `unknown`.
+  - It applies the Changes that merge, validates the whole content (N3), bumps the patch version (only the `version` string), and commits only the content file and `package.json` (V4).
+  - When `main` moved, it reads again and starts over, up to 3 times. After an uncertain failure it first checks whether that commit landed, so it never commits twice.
+  - The message is `content: publish <page>`, then `Changed:` with one line per merged path, then the `Edity-Client: <name>` trailer.
+- **The handler** checks, in order: `Origin` (403), the session (401), the body (400, or 413 over 1 MiB), then a per-Site rate limit (10 at once, then one every 2 minutes, so 429 with `Retry-After`). It answers 202, 409 or 422 as in the spec, and 500 or 503 when the repository or GitHub fails. The Publish finishes even if the browser leaves.
+- **Login:** `Sessions` is an interface for ticket 25. Until then no request has a session, so a real request gets 401.
+- **Checked:**
+  - Every status goes through `apitest.Handler` against `api/openapi.yaml`, so the 422 body is checked against the file (ticket 19).
+  - Tests cover `main` moving once (one commit on the new HEAD, Conflicts worked out again) and moving every time (503, no commit), a spurious STALE_DATA, and uncertain failures whether the commit landed or not.
+  - `mise run check:sandbox` (build tag `sandbox`, not in CI) published twice on edity-sandbox, with the `dev` credentials through `infisical run`:
+    - `4bc9310` changed `hero.cta` and was released as `v1.0.1`.
+    - `f50d2c4` put it back and was released as `v1.0.2`.
+    - For each commit it confirmed the author `edity-publisher[bot]` with a verified signature, the HEAD read as its only parent, the trailer, only the two files changed, the sandbox's CI green (`prettier --check` included), and the tag from Release on Publish.
+    - A stale `before` got 409 and a broken Limit 422, both leaving `main` unmoved.
+    - After the round trip `home.json` is byte for byte the original.
+- **Left over:**
+  - An uncertain commit that lands without GitHub saying so, with someone pushing on top before the next read, is answered as a Conflict instead of a success.
+  - Only this route checks `Origin` so far; ticket 25 adds it to the others.
+  - A content file whose objects were written collapsed gets them expanded on its first Publish, which still passes Prettier.
