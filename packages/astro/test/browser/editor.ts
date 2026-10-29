@@ -7,15 +7,9 @@ import {
   type Locator,
   type Page,
 } from '@playwright/test';
+import type { Session } from '../../src/editor/api.js';
 
 export { expect };
-
-/** What `GET /_edity/api/session` returns for a signed-in Client. */
-export interface Session {
-  readonly name: string;
-  readonly locale: string;
-  readonly site: string;
-}
 
 /** A Client who reads Spanish. */
 export const ana: Session = { name: 'Ana', locale: 'es', site: 'fixture' };
