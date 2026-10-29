@@ -2,7 +2,7 @@ import { Ajv2020, type AnySchemaObject } from 'ajv/dist/2020.js';
 import { describe, expect, test } from 'vitest';
 import { parse } from 'yaml';
 import openapi from '../../api/openapi.yaml?raw';
-import { isPageName } from '../pages.js';
+import { isWithin } from '../paths.js';
 import { publishRequest } from './api.js';
 import { Draft, type Change } from './draft.js';
 
@@ -36,14 +36,19 @@ describe("Publish's request against the OpenAPI file", () => {
   const validRequest = schemaAt(
     '/paths/~1_edity~1api~1publish/post/requestBody/content/application~1json/schema',
   );
-  /** A Draft with a Change of every kind, as the Editor records them. */
+  /**
+   * A Draft with a Change of every kind, as the Editor records them: a
+   * List whose structure changed is one Change, with no other Change inside
+   * it (S7).
+   */
   const changes: Change[] = [
     // A text Field and a number Field.
     { path: 'hero.title', before: 'Fisioterapia', after: 'Fisio en casa 🦴' },
     { path: 'visit.price', before: 35, after: 40.5 },
-    // A Field of an Item, in a List whose structure is unchanged.
+    // A Field of an Item, in `plans`, whose structure is unchanged.
     { path: 'plans.1.features.0', before: 'Cuatro', after: 'Cinco sesiones' },
-    // A List of texts, and a List of Items with a nested List.
+    // The structure of a List of texts, and of a List of Items with a
+    // nested List.
     {
       path: 'services',
       before: ['Suelo pélvico', 'Punción seca'],
@@ -51,15 +56,24 @@ describe("Publish's request against the OpenAPI file", () => {
       origins: [1, 0, null],
     },
     {
-      path: 'plans',
-      before: [{ name: 'Básico', price: 19.99, features: ['Una sesión'] }],
+      path: 'packs',
+      before: [{ name: 'Bono 5', price: 150, sessions: ['Cinco'] }],
       after: [
-        { name: 'Básico', price: 19.99, features: ['Una sesión'] },
-        { name: 'Completo', price: 49.5, features: ['Cuatro', 'Plan'] },
+        { name: 'Bono 5', price: 150, sessions: ['Cinco'] },
+        { name: 'Bono 10', price: 280.5, sessions: ['Diez', 'Plan'] },
       ],
       origins: [0, null],
     },
   ];
+
+  test('the Draft has no Change inside another, which the server refuses (S7)', () => {
+    for (const change of changes) {
+      const outer = changes.filter(
+        (other) => other !== change && isWithin(change.path, other.path),
+      );
+      expect(outer, change.path).toEqual([]);
+    }
+  });
 
   test("publishRequest's output is valid against the request schema", () => {
     const request = publishRequest(
@@ -75,17 +89,6 @@ describe("Publish's request against the OpenAPI file", () => {
   test('the schema refuses the Changes as the Draft keeps them', () => {
     // So publishRequest has to leave out what only the Draft keeps.
     expect(validRequest({ page: 'home', changes })).toBe(false);
-  });
-
-  test('the integration builds only pages whose name the schema takes', () => {
-    const change = { path: 'hero.title', before: 'Hola', after: 'Buenas' };
-    for (const page of [
-      ...['home', 'Precios', 'plan-2026', 'sobre_mi', '404'],
-      ...['_borrador', '-home', 'mi página', 'blog/post', 'home.json', ''],
-    ]) {
-      const request = { page, changes: [change] };
-      expect(isPageName(page), page).toBe(validRequest(request));
-    }
   });
 });
 

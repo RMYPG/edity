@@ -198,7 +198,7 @@ go list -m "$module"
 '''
 
 [tasks."api:pin"]
-description = "Pin edity-server's OpenAPI file at a commit, and generate the Editor's client types from it"
+description = "Pin edity-server's OpenAPI file at a commit, and generate the types of the Editor's API client from it"
 usage = '''
 arg "<commit>" help="The full sha of the edity-server commit, on its main branch"
 '''
@@ -234,7 +234,7 @@ mise run api:generate
 '''
 
 [tasks."api:generate"]
-description = "Generate the Editor's client types from edity-server's pinned OpenAPI file"
+description = "Generate the types of the Editor's API client from edity-server's pinned OpenAPI file"
 usage = '''
 flag "--check" help="Fail if the committed types are not the ones the OpenAPI file generates, instead of writing them"
 '''

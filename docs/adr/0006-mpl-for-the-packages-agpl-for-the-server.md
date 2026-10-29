@@ -4,4 +4,4 @@ Anyone may use Edity however they like, but forks and modifications must stay op
 
 ## Consequences
 
-`edity-server`'s OpenAPI description, `api/openapi.yaml`, is MPL-2.0 rather than AGPL-3.0. It is the contract between the two repositories: `edity` vendors it, and `@edity/astro` ships the Editor's client generated from it.
+`edity-server`'s OpenAPI description, `api/openapi.yaml`, is MPL-2.0 rather than AGPL-3.0. It is the contract between the two repositories: `edity` vendors it, and `@edity/astro` ships the Editor's API client generated from it.

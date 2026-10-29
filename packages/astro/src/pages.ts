@@ -3,10 +3,16 @@
 // `src/content/<page>.schema.json` (loaders.ts), which edity-server reads.
 
 /**
- * Whether edity-server takes `name` as a page's name, as the pattern of
- * `page` in Publish's request in its OpenAPI file has it: letters from A to
- * Z, digits, `-` and `_`, starting with a letter or a digit. The Editor's
- * tests check it against that file.
+ * The names edity-server takes for a page, in words that complete
+ * "edity-server takes only …": those the pattern of `page` in Publish's
+ * request in its OpenAPI file matches, as `isPageName` tells them.
+ */
+export const pageNames =
+  'letters from A to Z, digits, "-" and "_", starting with a letter or a digit';
+
+/**
+ * Whether edity-server takes `name` as a page's name: one of
+ * {@link pageNames}. `pages.test.ts` checks it against the OpenAPI file.
  */
 export function isPageName(name: string): boolean {
   return /^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name);
