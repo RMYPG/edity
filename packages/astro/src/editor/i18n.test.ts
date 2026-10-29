@@ -79,3 +79,14 @@ describe('the restored Draft (P2)', () => {
     expect(messagesFor('en').notApplied(2)).toBe('2 changes no longer apply');
   });
 });
+
+describe('a Release that failed after the commit (P5)', () => {
+  test('says the changes are saved, not live yet, and the Developer has been notified', () => {
+    expect(messagesFor('es').releaseFailed).toBe(
+      'Tus cambios están guardados, pero aún no se ven en la web: algo ha fallado por el camino. Ya se ha avisado a tu desarrollador.',
+    );
+    expect(messagesFor('en').releaseFailed).toBe(
+      'Your changes are saved, but they are not live yet: something went wrong on the way. Your developer has been notified.',
+    );
+  });
+});
