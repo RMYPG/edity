@@ -2,6 +2,7 @@ import { Ajv2020, type AnySchemaObject } from 'ajv/dist/2020.js';
 import { describe, expect, test } from 'vitest';
 import { parse } from 'yaml';
 import openapi from '../../api/openapi.yaml?raw';
+import { isPageName } from '../pages.js';
 import { publishRequest } from './api.js';
 import { Draft, type Change } from './draft.js';
 
@@ -74,6 +75,17 @@ describe("Publish's request against the OpenAPI file", () => {
   test('the schema refuses the Changes as the Draft keeps them', () => {
     // So publishRequest has to leave out what only the Draft keeps.
     expect(validRequest({ page: 'home', changes })).toBe(false);
+  });
+
+  test('the integration builds only pages whose name the schema takes', () => {
+    const change = { path: 'hero.title', before: 'Hola', after: 'Buenas' };
+    for (const page of [
+      ...['home', 'Precios', 'plan-2026', 'sobre_mi', '404'],
+      ...['_borrador', '-home', 'mi página', 'blog/post', 'home.json', ''],
+    ]) {
+      const request = { page, changes: [change] };
+      expect(isPageName(page), page).toBe(validRequest(request));
+    }
   });
 });
 
