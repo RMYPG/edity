@@ -68,6 +68,10 @@ _Avoid_: Save, deploy, commit
 A tagged, versioned build of a Site, ready to be deployed. Every Publish produces one Release; deploying it is outside Edity.
 _Avoid_: Version, build, deployment
 
+**Live**:
+The stage a Publish reaches once production runs its Release or a newer one.
+_Avoid_: Deployed, done
+
 **Conflict**:
 A Field in a Draft whose stored value no longer matches the value it had when the Client started editing it.
 _Avoid_: Clash, collision
