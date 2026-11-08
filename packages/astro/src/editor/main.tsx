@@ -9,6 +9,7 @@ import { editorRoot, readPage } from './documents.js';
 import {
   draftStore,
   keepDraft,
+  loginReturnStore,
   progressStore,
   publishedStore,
   type DraftStore,
@@ -71,6 +72,7 @@ async function start(): Promise<void> {
           {
             published: page && publishedStore(result.session.site, page.page),
             progress: progressStore(result.session.site),
+            loginReturn: loginReturnStore(result.session.site),
           },
         ),
       };

@@ -19,6 +19,8 @@ export const markup = {
   template: 'data-edity-template',
   /** Set by the Editor on a Field over a Limit: `over` or `warning`. */
   limit: 'data-edity-limit',
+  /** Set by the Editor on what the server refused of a Publish. */
+  rejected: 'data-edity-rejected',
   /** Set by the Editor on the phone preview's <iframe>. */
   preview: 'data-edity-preview',
 } as const;

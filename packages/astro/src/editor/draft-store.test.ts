@@ -3,6 +3,7 @@ import { Draft, type Change } from './draft.js';
 import {
   draftStore,
   keepDraft,
+  loginReturnStore,
   progressStore,
   publishedStore,
   type KeptStorage,
@@ -252,5 +253,33 @@ describe('progressStore', () => {
 
     expect(store.load()).toBeUndefined();
     expect(() => store.keep(progress)).not.toThrow();
+  });
+});
+
+describe('loginReturnStore', () => {
+  test('tells once that the Client was sent to log in (A3)', () => {
+    const storage = memory();
+    loginReturnStore('fixture', () => storage).mark();
+
+    const store = loginReturnStore('fixture', () => storage);
+
+    expect(store.take()).toBe(true);
+    expect(store.take()).toBe(false);
+  });
+
+  test('is per Site', () => {
+    const storage = memory();
+    loginReturnStore('fixture', () => storage).mark();
+
+    expect(loginReturnStore('other', () => storage).take()).toBe(false);
+  });
+
+  test('survives storage that throws', () => {
+    const store = loginReturnStore('fixture', () => {
+      throw new Error('blocked');
+    });
+
+    expect(() => store.mark()).not.toThrow();
+    expect(store.take()).toBe(false);
   });
 });

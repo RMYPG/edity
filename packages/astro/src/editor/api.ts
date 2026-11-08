@@ -83,19 +83,46 @@ export function publishRequest(
   };
 }
 
+type PublishCode = keyof PublishCall['responses'];
+
 /** A Publish the server took, as `POST /_edity/api/publish` answers it. */
 export type Published =
   PublishCall['responses'][202]['content']['application/json'];
 
+type Conflicts = PublishCall['responses'][409]['content']['application/json'];
+type Violations = PublishCall['responses'][422]['content']['application/json'];
+
+/** Why a Publish did not go through, when it was not the Draft's fault. */
+export type PublishProblem =
+  /** 429: too many Publishes lately (V5), with how long to wait, in seconds. */
+  | { readonly kind: 'rate-limited'; readonly retryAfter: number | undefined }
+  /** 413: the Draft is larger than a Publish can be. */
+  | { readonly kind: 'too-large' }
+  /** 500: the Site repository cannot be published as it is. */
+  | { readonly kind: 'site-broken' }
+  /** 503: for now. The Client can publish again later. */
+  | { readonly kind: 'unavailable' }
+  /** Any other answer the Editor has nothing to tell the Client about. */
+  | { readonly kind: 'refused' }
+  /** The server could not be reached, or answered nonsense. */
+  | { readonly kind: 'offline' };
+
 /** How the server answered a Publish. */
 export type PublishResult =
+  /** 202: committed, but for the Changes at `conflicts`. */
   | {
       readonly status: 'published';
       readonly sha: Published['sha'];
       readonly version: Published['version'];
+      readonly conflicts: readonly string[];
     }
-  /** The server could not be reached, failed or answered nonsense. */
-  | { readonly status: 'failed' };
+  /** 409: nothing merged. `conflicts` are the Changes that are Conflicts. */
+  | { readonly status: 'conflicts'; readonly conflicts: readonly string[] }
+  /** 422: what the Field definitions refused, by content path. */
+  | { readonly status: 'violations'; readonly violations: readonly string[] }
+  /** 401: no session, or an expired one (A3). */
+  | { readonly status: 'signed-out' }
+  | { readonly status: 'failed'; readonly problem: PublishProblem };
 
 /** Sends a Publish. Never throws. */
 export async function publish(request: PublishRequest): Promise<PublishResult> {
@@ -104,15 +131,61 @@ export async function publish(request: PublishRequest): Promise<PublishResult> {
     answer = await api.POST('/_edity/api/publish', { body: request });
   } catch {
     // Unreachable, or a 2xx whose body is not JSON.
-    return { status: 'failed' };
+    return failed({ kind: 'offline' });
   }
-  const { data, response } = answer;
-  if (response.status === (202 satisfies keyof PublishCall['responses'])) {
-    if (data !== undefined) {
-      return { status: 'published', sha: data.sha, version: data.version };
-    }
+  const { data, error, response } = answer;
+  // `satisfies` keeps each status the Editor tells apart in the file.
+  switch (response.status) {
+    case 202 satisfies PublishCode:
+      return isPublished(data)
+        ? {
+            status: 'published',
+            sha: data.sha,
+            version: data.version,
+            conflicts: pathsOf(data.conflicts ?? []),
+          }
+        : failed({ kind: 'offline' });
+    case 401 satisfies PublishCode:
+      return { status: 'signed-out' };
+    case 409 satisfies PublishCode:
+      return isConflicts(error)
+        ? { status: 'conflicts', conflicts: pathsOf(error.conflicts) }
+        : failed({ kind: 'refused' });
+    case 413 satisfies PublishCode:
+      return failed({ kind: 'too-large' });
+    case 422 satisfies PublishCode:
+      return isViolations(error)
+        ? { status: 'violations', violations: pathsOf(error.violations) }
+        : failed({ kind: 'refused' });
+    case 429 satisfies PublishCode:
+      return failed({
+        kind: 'rate-limited',
+        retryAfter: retryAfterOf(response),
+      });
+    case 500 satisfies PublishCode:
+      return failed({ kind: 'site-broken' });
+    case 503 satisfies PublishCode:
+      return failed({ kind: 'unavailable' });
+    default:
+      return failed({ kind: 'refused' });
   }
-  return { status: 'failed' };
+}
+
+function failed(problem: PublishProblem): PublishResult {
+  return { status: 'failed', problem };
+}
+
+/** The distinct content paths of Conflicts or violations. */
+function pathsOf(
+  found: readonly { readonly path: string }[],
+): readonly string[] {
+  return [...new Set(found.map(({ path }) => path))];
+}
+
+/** The seconds a response says to wait, if it says. */
+function retryAfterOf(response: Response): number | undefined {
+  const seconds = Number(response.headers.get('Retry-After') ?? Number.NaN);
+  return Number.isInteger(seconds) && seconds > 0 ? seconds : undefined;
 }
 
 /** Where the Release of a Publish's commit is (P4). */
@@ -122,8 +195,12 @@ export type PublishStatus =
 /** How the server answered about a Publish's progress. */
 export type PublishStatusResult =
   | ({ readonly status: 'known' } & PublishStatus)
-  /** The server could not say, for now. */
-  | { readonly status: 'unknown' };
+  /** 404: not a Publish's commit, or no longer one on the Site. */
+  | { readonly status: 'not-found' }
+  /** 401: no session, or an expired one. */
+  | { readonly status: 'signed-out' }
+  /** The server could not say for now. Ask again, after `retryAfter` s. */
+  | { readonly status: 'unknown'; readonly retryAfter: number | undefined };
 
 /** Asks how the Publish of commit `sha` is going. Never throws. */
 export async function getPublishStatus(
@@ -137,13 +214,77 @@ export async function getPublishStatus(
       cache: 'no-store',
     });
   } catch {
-    return { status: 'unknown' };
+    return { status: 'unknown', retryAfter: undefined };
   }
-  const { data } = answer;
-  return data === undefined
-    ? { status: 'unknown' }
-    : { status: 'known', ...data };
+  const { data, response } = answer;
+  type Code = keyof PublishStatusCall['responses'];
+  if (response.status === (401 satisfies Code)) return { status: 'signed-out' };
+  if (response.status === (404 satisfies Code)) return { status: 'not-found' };
+  return isPublishStatus(data)
+    ? { status: 'known', ...data }
+    : { status: 'unknown', retryAfter: retryAfterOf(response) };
 }
+
+function isPublished(body: unknown): body is Published {
+  if (typeof body !== 'object' || body === null) return false;
+  const { sha, version, conflicts } = body as Partial<
+    Record<keyof Published, unknown>
+  >;
+  return (
+    typeof sha === 'string' &&
+    typeof version === 'string' &&
+    (conflicts === undefined || isPathList(conflicts))
+  );
+}
+
+function isConflicts(body: unknown): body is Conflicts {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    isPathList((body as Partial<Conflicts>).conflicts)
+  );
+}
+
+function isViolations(body: unknown): body is Violations {
+  return (
+    typeof body === 'object' &&
+    body !== null &&
+    isPathList((body as Partial<Violations>).violations)
+  );
+}
+
+function isPathList(found: unknown): found is { readonly path: string }[] {
+  return (
+    Array.isArray(found) &&
+    found.every(
+      (each: { readonly path?: unknown } | null) =>
+        typeof each?.path === 'string',
+    )
+  );
+}
+
+/** Whether the status call's 200 answered a stage the file has. */
+function isPublishStatus(body: unknown): body is PublishStatus {
+  if (typeof body !== 'object' || body === null) return false;
+  const { stage, version } = body as Partial<
+    Record<keyof PublishStatus, unknown>
+  >;
+  return (
+    typeof stage === 'string' &&
+    Object.hasOwn(stages, stage) &&
+    typeof version === 'string'
+  );
+}
+
+/** Every stage the server can answer: a change to the file fails the type-check. */
+const stages: Readonly<Record<PublishStatus['stage'], true>> = {
+  validating: true,
+  releasing: true,
+  released: true,
+  deploying: true,
+  live: true,
+  failed: true,
+};
 
 /** Whether the session call's 200 answered a session, as the file says. */
 function isSession(body: unknown): body is Session {

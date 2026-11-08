@@ -6,17 +6,30 @@
 // it was built from. What was published is the Field's value for everything
 // that reads the page's content: the next Change's `before` (P8), Discard and
 // the phone preview. A Client who reloads gets all of this back (P4).
-import { batch, signal, type ReadonlySignal } from '@preact/signals';
+import {
+  batch,
+  effect,
+  signal,
+  untracked,
+  type ReadonlySignal,
+} from '@preact/signals';
 import {
   getPublishStatus,
   publish,
   publishRequest,
   type PublishStatus,
 } from './api.js';
+import type { PageMarker } from '../editable.js';
 import { fitsDraft, setValueAt } from './content.js';
 import type { Change } from './draft.js';
-import type { DraftStore, ProgressStore } from './draft-store.js';
+import type {
+  DraftStore,
+  LoginReturnStore,
+  ProgressStore,
+} from './draft-store.js';
+import type { PublishNotice } from './publish-i18n.js';
 import { stillToBuild } from './published.js';
+import { rejectedMarks } from './rejected.js';
 import { showDraft } from './show-draft.js';
 import type { Editing } from './state.js';
 
@@ -40,6 +53,13 @@ export interface Progress {
 export interface Publishing {
   /** The Publish the bar follows, if any. */
   readonly progress: ReadonlySignal<Progress | undefined>;
+  /** Whether the Publish's progress could not be read lately. */
+  readonly progressUnknown: ReadonlySignal<boolean>;
+  /**
+   * What the Client has to be told about their last Publish, until they
+   * close it or change the Draft (P5).
+   */
+  readonly notice: ReadonlySignal<PublishNotice | undefined>;
   /**
    * The Changes published that the page as built may not hold yet, in the
    * order they were published.
@@ -47,6 +67,10 @@ export interface Publishing {
   published(): readonly Change[];
   /** Sends the Draft to the server. */
   publish(): Promise<void>;
+  /** Stops showing a Publish that has reached its end. */
+  closeProgress(): void;
+  /** Stops showing the notice. */
+  closeNotice(): void;
 }
 
 /** Where the Editor keeps its Publishes in the browser. */
@@ -54,12 +78,14 @@ export interface PublishingStores {
   /** The page's published Changes, on a page with something to edit. */
   readonly published: DraftStore | undefined;
   readonly progress: ProgressStore;
+  readonly loginReturn: LoginReturnStore;
 }
 
 /**
  * Starts publishing the page's Draft, for as long as the Editor runs, and
- * picks up what an earlier page load left: the Publish it followed, and the
- * Changes published that the page was not built with yet.
+ * picks up what an earlier page load left: the Publish it followed, the
+ * Changes published that the page was not built with yet, and a Client just
+ * back from logging in.
  */
 export function startPublishing(
   { state, fields, lists }: Pick<Editing, 'state' | 'fields' | 'lists'>,
@@ -67,8 +93,21 @@ export function startPublishing(
 ): Publishing {
   const { draft, page, view } = state;
   const progress = signal(stores.progress.load());
+  const progressUnknown = signal(false);
+  const notice = signal<PublishNotice | undefined>(
+    stores.loginReturn.take() ? { kind: 'signed-back-in' } : undefined,
+  );
+  const rejected = rejectedMarks(document);
+  /** The Changes published that the page as built may not hold yet. */
   let published: readonly Change[] = [];
+  /** The Draft a notice is about: it goes once the Draft changes. */
+  let noticed = draft.changes.peek();
   let timer = 0;
+  /** How many times in a row the progress could not be read. */
+  let unreadable = 0;
+
+  /** The value at `path` for the Client now: the Draft's, or the page's. */
+  const valueNow = (path: string) => draft.valueAt(path, page?.content);
 
   /** Makes `changes`, already on the page, what it holds as published. */
   function settle(changes: readonly Change[]): void {
@@ -79,15 +118,28 @@ export function startPublishing(
     lists.settle(changes.map(({ path }) => path));
   }
 
-  if (page !== undefined) {
-    const kept = stores.published?.load() ?? [];
-    published = stillToBuild(
-      page.content,
-      kept.filter((change) => fitsDraft(page.fields, change)),
-    );
-    if (published.length !== kept.length) stores.published?.keep(published);
-    showDraft({ fields, lists }, published);
-    settle(published);
+  /** Takes `changes`, which the server now holds, out of the Draft for good. */
+  function keepPublished(changes: readonly Change[]): void {
+    // The content first: the phone preview puts each Change that leaves the
+    // Draft back as the content has it.
+    batch(() => {
+      settle(changes);
+      for (const { path } of changes) draft.remove(path);
+    });
+    published = [...published, ...changes];
+    stores.published?.keep(published);
+  }
+
+  /** Tells the Client `next`, until they close it or change the Draft. */
+  function tell(next: PublishNotice): void {
+    notice.value = next;
+    noticed = draft.changes.peek();
+  }
+
+  /** Marks the Conflicts at `paths`, and says they stay in the Draft. */
+  function conflicted(paths: readonly string[], merged: boolean): void {
+    rejected.mark(paths, valueNow);
+    tell({ kind: 'conflicts', count: paths.length, published: merged });
   }
 
   function show(next: Progress | undefined): void {
@@ -104,47 +156,131 @@ export function startPublishing(
     const followed = progress.peek();
     if (followed === undefined) return;
     const result = await getPublishStatus(followed.sha);
-    // A newer Publish took its place while it was asked.
+    // A newer Publish took its place, or it was closed, while it was asked.
     if (progress.peek()?.sha !== followed.sha) return;
-    if (result.status === 'known') {
-      const stage = shownStage(result.stage);
-      show({ ...followed, stage });
-      if (stage === 'released' || stage === 'failed') return;
+    switch (result.status) {
+      case 'known': {
+        unreadable = 0;
+        progressUnknown.value = false;
+        const stage = shownStage(result.stage);
+        show({ ...followed, stage });
+        if (!hasEnded(stage)) follow(pollEvery);
+        return;
+      }
+      case 'not-found':
+        // Not a Publish the server knows, so there is nothing to follow.
+        show(undefined);
+        return;
+      case 'signed-out':
+        // Back on the next page load, once logged in again.
+        progressUnknown.value = true;
+        return;
+      case 'unknown':
+        // A moment's 503 is not worth a word.
+        unreadable++;
+        if (unreadable >= 2) progressUnknown.value = true;
+        follow(Math.max(pollEvery, (result.retryAfter ?? 0) * 1000));
+        return;
     }
-    follow(pollEvery);
   }
 
+  /** Sends the Client to log in, to come back to this page (A3). */
+  function sendToLogin(): void {
+    stores.loginReturn.mark();
+    location.assign(
+      `/_edity/login?return=${encodeURIComponent(location.pathname)}`,
+    );
+  }
+
+  async function send(page: PageMarker): Promise<void> {
+    const changes = [...draft.changes.peek().values()];
+    const merged = (conflicts: readonly string[]) =>
+      changes.filter(({ path }) => !conflicts.includes(path));
+    const result = await publish(publishRequest(page.page, changes));
+    switch (result.status) {
+      case 'published':
+        keepPublished(merged(result.conflicts));
+        if (result.conflicts.length > 0) conflicted(result.conflicts, true);
+        unreadable = 0;
+        progressUnknown.value = false;
+        show({ sha: result.sha, version: result.version, stage: 'validating' });
+        follow(pollEvery);
+        return;
+      case 'conflicts':
+        // A Change that is not a Conflict was already published.
+        keepPublished(merged(result.conflicts));
+        conflicted(result.conflicts, false);
+        return;
+      case 'violations':
+        tell({
+          kind: 'violations',
+          count: result.violations.length,
+          marked: rejected.mark(result.violations, valueNow),
+        });
+        return;
+      case 'signed-out':
+        sendToLogin();
+        return;
+      case 'failed':
+        tell(result.problem);
+        return;
+    }
+  }
+
+  // What an earlier page load left: the Changes it published, which go on the
+  // page before the Draft does, and the Publish it followed.
+  if (page !== undefined) {
+    const kept = stores.published?.load() ?? [];
+    published = stillToBuild(
+      page.content,
+      kept.filter((change) => fitsDraft(page.fields, change)),
+    );
+    if (published.length !== kept.length) stores.published?.keep(published);
+    showDraft({ fields, lists }, published);
+    settle(published);
+  }
   if (progress.peek() !== undefined) follow(0);
+
+  // A mark is about the value it is on, and a notice about the whole Draft.
+  effect(() => {
+    const changes = draft.changes.value;
+    untracked(() => {
+      rejected.update(valueNow);
+      if (changes !== noticed) notice.value = undefined;
+    });
+  });
 
   return {
     progress,
+    progressUnknown,
+    notice,
     published: () => published,
     async publish() {
       if (page === undefined || state.publishDisabled.peek()) return;
       // Nothing on the page can change until the server has answered, and a
       // Field being edited is left, which records it.
       view.value = 'publishing';
-      const changes = [...draft.changes.peek().values()];
-      const result = await publish(publishRequest(page.page, changes));
-      if (result.status === 'published') {
-        // The content first: the phone preview puts each Change that leaves
-        // the Draft back as the content has it.
-        batch(() => {
-          settle(changes);
-          for (const { path } of changes) draft.remove(path);
-        });
-        published = [...published, ...changes];
-        stores.published?.keep(published);
-        show({
-          sha: result.sha,
-          version: result.version,
-          stage: 'validating',
-        });
-        follow(pollEvery);
+      notice.value = undefined;
+      rejected.clear();
+      try {
+        await send(page);
+      } finally {
+        view.value = 'edit';
       }
-      view.value = 'edit';
+    },
+    closeProgress() {
+      clearTimeout(timer);
+      show(undefined);
+    },
+    closeNotice() {
+      notice.value = undefined;
     },
   };
+}
+
+/** Whether nothing more will come of a Publish at `stage` by itself. */
+export function hasEnded(stage: ShownStage): boolean {
+  return stage === 'released' || stage === 'failed';
 }
 
 /** How a stage shows until ticket 33 adds Deploying and Live. */

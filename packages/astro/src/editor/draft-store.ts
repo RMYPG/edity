@@ -126,6 +126,42 @@ export function progressStore(
   };
 }
 
+/**
+ * Remembers, for the tab, that a Client was sent to log in from a Publish, so
+ * the Editor can tell them why they are back (A3). Kept in sessionStorage,
+ * which the redirects through Zitadel leave as they found it.
+ */
+export interface LoginReturnStore {
+  mark(): void;
+  /** Whether they were sent there, once: it also forgets it. */
+  take(): boolean;
+}
+
+export function loginReturnStore(
+  site: string,
+  storage: () => KeptStorage = () => window.sessionStorage,
+): LoginReturnStore {
+  const key = `edity:login-return:v1:${encodeURIComponent(site)}`;
+  return {
+    mark() {
+      try {
+        storage().setItem(key, '1');
+      } catch {
+        // Blocked: the Client just gets no word of it on return.
+      }
+    },
+    take() {
+      try {
+        const marked = storage().getItem(key) !== null;
+        storage().removeItem(key);
+        return marked;
+      } catch {
+        return false;
+      }
+    },
+  };
+}
+
 /** Keeps `draft` in `store` from now on, each time it changes. */
 export function keepDraft(draft: Draft, store: DraftStore): () => void {
   return effect(() => {

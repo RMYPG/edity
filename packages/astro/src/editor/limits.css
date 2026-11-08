@@ -21,3 +21,13 @@
   outline: 2px dashed rgb(217 119 6) !important;
   outline-offset: 2px !important;
 }
+
+/* What the server refused of a Publish (V1, V2): the Field stays marked until
+   the Client changes it, as the Draft keeps it. */
+:root [data-edity-field][data-edity-rejected],
+:root [data-edity-field][data-edity-rejected]:is(:hover, :focus),
+:root [data-edity-list][data-edity-rejected],
+:root [data-edity-item][data-edity-rejected] {
+  outline: 2px solid rgb(220 38 38) !important;
+  outline-offset: 2px !important;
+}

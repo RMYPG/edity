@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import { Counters } from './Counters.js';
 import { ListControls } from './ListControls.js';
 import { Preview, PreviewToggle } from './Preview.js';
-import { PublishProgress } from './PublishProgress.js';
+import { PublishNotices, PublishProgress } from './PublishProgress.js';
 import { asBuilt, showDraft } from './show-draft.js';
 import type { Editing, EditorState } from './state.js';
 
@@ -17,7 +17,7 @@ interface Props {
 
 /** The Editor's controls, rendered into its shadow root. */
 export function Editor({ editing }: Props) {
-  const { state, lists, limits } = editing;
+  const { state, lists, limits, publishing } = editing;
   // A view that appears after the first render came from the Client's
   // click, so it takes the focus the other view's button had.
   const started = useRef(false);
@@ -29,7 +29,10 @@ export function Editor({ editing }: Props) {
   const preview = useSignal(false);
 
   return (
-    <div class="edity" lang={state.locale}>
+    <div
+      class={publishing.progress.value ? 'edity following' : 'edity'}
+      lang={state.locale}
+    >
       {state.view.value === 'visitor' ? (
         <BackToEditing state={state} focus={focus} />
       ) : (
@@ -40,7 +43,10 @@ export function Editor({ editing }: Props) {
           <Bar editing={editing} focus={focus} preview={preview} />
           <PublishProgress editing={editing} />
           <Counters limits={limits} t={state.t} />
-          <NotApplied state={state} />
+          <div class="notices">
+            <PublishNotices editing={editing} />
+            <NotApplied state={state} />
+          </div>
           {preview.value && <Preview editing={editing} open={preview} />}
         </>
       )}

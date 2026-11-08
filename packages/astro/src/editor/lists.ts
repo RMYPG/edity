@@ -821,7 +821,8 @@ function editPage(
 
     return () => {
       drags.cancel();
-      // A removal on its way in a Publish can no longer be put back.
+      // The Undo goes with the controls: an Item whose removal is being
+      // published cannot be put back.
       undos.dismiss();
       removeSheet();
       hovered.value = undefined;
