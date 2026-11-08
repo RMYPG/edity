@@ -16,13 +16,16 @@ import {
   type Messages,
 } from './i18n.js';
 import type { Lists } from './lists.js';
+import type { Publishing } from './publishing.js';
 import type { Limits } from './watch-limits.js';
 
 /**
- * How the Editor shows the page: `edit` with every Editor control, or
- * `visitor` with none of them (P7), only a way back.
+ * How the Editor shows the page: `edit` with every Editor control, `visitor`
+ * with none of them (P7), only a way back, or `publishing` with the bar
+ * while the Draft is on its way to the server, when nothing on the page can
+ * change.
  */
-export type View = 'edit' | 'visitor';
+export type View = 'edit' | 'visitor' | 'publishing';
 
 /** Everything the Editor knows while a Client edits a page. */
 export interface EditorState {
@@ -56,22 +59,23 @@ export interface EditorState {
    */
   readonly overLimit: Signal<boolean>;
   /**
-   * Whether Publish is disabled: it is while the Draft is empty, while a
-   * Change holds a value its Field cannot, such as a blank text, or while a
-   * changed Field breaks a Limit.
+   * Whether Publish is disabled: it is while the Draft is empty or already
+   * on its way, while a Change holds a value its Field cannot, such as a
+   * blank text, or while a changed Field breaks a Limit.
    */
   readonly publishDisabled: ReadonlySignal<boolean>;
 }
 
 /**
- * The Editor at work on a page: its state, and the page's Fields, Lists and
- * Limits, as it edits and checks them.
+ * The Editor at work on a page: its state, the page's Fields, Lists and
+ * Limits, as it edits and checks them, and its Publishes.
  */
 export interface Editing {
   readonly state: EditorState;
   readonly fields: Fields;
   readonly lists: Lists;
   readonly limits: Limits;
+  readonly publishing: Publishing;
 }
 
 export interface EditorStateOptions {
@@ -92,6 +96,7 @@ export function createEditorState({
 }: EditorStateOptions): EditorState {
   const locale = chooseLocale(session.locale, languages);
   const draft = new Draft(changes);
+  const view = signal<View>('edit');
   const overLimit = signal(false);
   return {
     session,
@@ -100,10 +105,11 @@ export function createEditorState({
     t: messagesFor(locale),
     draft,
     notApplied: signal(0),
-    view: signal('edit'),
+    view,
     overLimit,
     publishDisabled: computed(
       () =>
+        view.value === 'publishing' ||
         draft.count.value === 0 ||
         overLimit.value ||
         (page !== undefined &&

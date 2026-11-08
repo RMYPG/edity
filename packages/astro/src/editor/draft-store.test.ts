@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { Draft, type Change } from './draft.js';
-import { draftStore, keepDraft, type KeptStorage } from './draft-store.js';
+import {
+  draftStore,
+  keepDraft,
+  progressStore,
+  publishedStore,
+  type KeptStorage,
+} from './draft-store.js';
 
 const title: Change = {
   path: 'hero.title',
@@ -171,5 +177,80 @@ describe('keepDraft', () => {
     stop();
     draft.record(price);
     expect(storage.items.size).toBe(0);
+  });
+});
+
+describe('publishedStore', () => {
+  test('keeps what a page has published, apart from its Draft', () => {
+    const storage = memory();
+    const draft = draftStore('fixture', 'home', () => storage);
+    const published = publishedStore('fixture', 'home', () => storage);
+    const change = { path: 'hero.title', before: 'A', after: 'B' };
+
+    published.keep([change]);
+
+    expect(published.load()).toEqual([change]);
+    expect(draft.load()).toEqual([]);
+  });
+
+  test('forgets it when nothing is left', () => {
+    const storage = memory();
+    const published = publishedStore('fixture', 'home', () => storage);
+
+    published.keep([{ path: 'hero.title', before: 'A', after: 'B' }]);
+    published.keep([]);
+
+    expect(storage.getItem('edity:published:v1:fixture:home')).toBeNull();
+  });
+});
+
+describe('progressStore', () => {
+  const progress = {
+    sha: 'a'.repeat(40),
+    version: '1.4.3',
+    stage: 'releasing',
+  } as const;
+
+  test("keeps the Site's followed Publish, for any page of it (P4)", () => {
+    const storage = memory();
+
+    progressStore('fixture', () => storage).keep(progress);
+
+    expect(progressStore('fixture', () => storage).load()).toEqual(progress);
+    expect(progressStore('other', () => storage).load()).toBeUndefined();
+  });
+
+  test('forgets it when there is none', () => {
+    const storage = memory();
+    const store = progressStore('fixture', () => storage);
+
+    store.keep(progress);
+    store.keep(undefined);
+
+    expect(store.load()).toBeUndefined();
+  });
+
+  test.each([
+    ['what is not JSON', '{'],
+    ['another shape', '{"sha":1}'],
+    ['a sha that is not one', '{"sha":"x","version":"1.0.0","stage":"failed"}'],
+    [
+      'a stage the Editor does not show',
+      `{"sha":"${'a'.repeat(40)}","version":"1.0.0","stage":"live"}`,
+    ],
+  ])('ignores %s', (_, kept) => {
+    const storage = memory();
+    storage.setItem('edity:publish:v1:fixture', kept);
+
+    expect(progressStore('fixture', () => storage).load()).toBeUndefined();
+  });
+
+  test('survives storage that throws', () => {
+    const store = progressStore('fixture', () => {
+      throw new Error('blocked');
+    });
+
+    expect(store.load()).toBeUndefined();
+    expect(() => store.keep(progress)).not.toThrow();
   });
 });

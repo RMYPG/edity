@@ -15,6 +15,7 @@ const api = createClient<paths>();
 
 type SessionCall = paths['/_edity/api/session']['get'];
 type PublishCall = paths['/_edity/api/publish']['post'];
+type PublishStatusCall = paths['/_edity/api/publish/{sha}']['get'];
 
 /** The signed-in Client, as `GET /_edity/api/session` returns them. */
 export type Session =
@@ -80,6 +81,68 @@ export function publishRequest(
       after,
     })),
   };
+}
+
+/** A Publish the server took, as `POST /_edity/api/publish` answers it. */
+export type Published =
+  PublishCall['responses'][202]['content']['application/json'];
+
+/** How the server answered a Publish. */
+export type PublishResult =
+  | {
+      readonly status: 'published';
+      readonly sha: Published['sha'];
+      readonly version: Published['version'];
+    }
+  /** The server could not be reached, failed or answered nonsense. */
+  | { readonly status: 'failed' };
+
+/** Sends a Publish. Never throws. */
+export async function publish(request: PublishRequest): Promise<PublishResult> {
+  let answer;
+  try {
+    answer = await api.POST('/_edity/api/publish', { body: request });
+  } catch {
+    // Unreachable, or a 2xx whose body is not JSON.
+    return { status: 'failed' };
+  }
+  const { data, response } = answer;
+  if (response.status === (202 satisfies keyof PublishCall['responses'])) {
+    if (data !== undefined) {
+      return { status: 'published', sha: data.sha, version: data.version };
+    }
+  }
+  return { status: 'failed' };
+}
+
+/** Where the Release of a Publish's commit is (P4). */
+export type PublishStatus =
+  PublishStatusCall['responses'][200]['content']['application/json'];
+
+/** How the server answered about a Publish's progress. */
+export type PublishStatusResult =
+  | ({ readonly status: 'known' } & PublishStatus)
+  /** The server could not say, for now. */
+  | { readonly status: 'unknown' };
+
+/** Asks how the Publish of commit `sha` is going. Never throws. */
+export async function getPublishStatus(
+  sha: string,
+): Promise<PublishStatusResult> {
+  let answer;
+  try {
+    answer = await api.GET('/_edity/api/publish/{sha}', {
+      params: { path: { sha } },
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    });
+  } catch {
+    return { status: 'unknown' };
+  }
+  const { data } = answer;
+  return data === undefined
+    ? { status: 'unknown' }
+    : { status: 'known', ...data };
 }
 
 /** Whether the session call's 200 answered a session, as the file says. */

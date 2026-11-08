@@ -151,6 +151,40 @@ button:focus-visible {
   color: var(--edity-muted);
 }
 
+/* A Publish's progress (P4), just above the bar. */
+.progress {
+  position: fixed;
+  z-index: 2147483647;
+  bottom: calc(66px + env(safe-area-inset-bottom));
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100% - 16px);
+  padding: 6px 12px;
+  border-radius: 10px;
+  background: var(--edity-surface);
+  box-shadow: var(--edity-shadow);
+  transform: translateX(-50%);
+}
+
+.steps {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  color: var(--edity-muted);
+  font-size: 13px;
+  line-height: 18px;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.steps [aria-current='step'] {
+  color: var(--edity-text);
+  font-weight: 600;
+}
+
 /* The phone preview, at an iPhone's 390 x 844 px when the window holds it,
    above the bar on the right. Under the bar, which stays on top. */
 .preview {

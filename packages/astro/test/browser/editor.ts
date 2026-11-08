@@ -6,6 +6,7 @@ import {
   type FrameLocator,
   type Locator,
   type Page,
+  type Route,
 } from '@playwright/test';
 import type { Session } from '../../src/editor/api.js';
 
@@ -65,6 +66,67 @@ export const test = base.extend<EditorFixtures>({
     });
   },
 });
+
+/** An answer of the mocked API. */
+export interface MockAnswer {
+  readonly status: number;
+  readonly json?: unknown;
+  readonly headers?: Record<string, string>;
+}
+
+/**
+ * edity-server's Publish and status routes, which `astro preview` does not
+ * serve, as a test sets them up. Set the answers before they are asked for.
+ */
+export interface MockPublishApi {
+  /** Every Publish the Editor sent, in order. */
+  readonly published: unknown[];
+  /** How many times the Editor asked for each commit's progress. */
+  readonly asked: Map<string, number>;
+  /**
+   * What the next Publish answers. A function can see the body; `'abort'`
+   * cuts the connection.
+   */
+  publish: MockAnswer | 'abort' | ((body: unknown) => MockAnswer | 'abort');
+  /** What each commit's progress answers: `'abort'` cuts the connection. */
+  status: Record<string, MockAnswer | 'abort'>;
+}
+
+/** Answers the page's Publish and status calls as `MockPublishApi` says. */
+export async function mockPublishApi(page: Page): Promise<MockPublishApi> {
+  const api: MockPublishApi = {
+    published: [],
+    asked: new Map(),
+    publish: { status: 500 },
+    status: {},
+  };
+  const fulfil = (route: Route, answer: MockAnswer | 'abort') =>
+    answer === 'abort'
+      ? route.abort('connectionfailed')
+      : route.fulfill(
+          answer.json === undefined
+            ? { status: answer.status, headers: answer.headers }
+            : {
+                status: answer.status,
+                headers: answer.headers,
+                json: answer.json,
+              },
+        );
+  await page.route('**/_edity/api/publish', (route) => {
+    const body: unknown = route.request().postDataJSON();
+    api.published.push(body);
+    return fulfil(
+      route,
+      typeof api.publish === 'function' ? api.publish(body) : api.publish,
+    );
+  });
+  await page.route('**/_edity/api/publish/*', (route) => {
+    const sha = new URL(route.request().url()).pathname.split('/').at(-1)!;
+    api.asked.set(sha, (api.asked.get(sha) ?? 0) + 1);
+    return fulfil(route, api.status[sha] ?? { status: 404 });
+  });
+  return api;
+}
 
 /** Records the path of every request the page makes from now on. */
 export function recordRequests(page: Page): string[] {
