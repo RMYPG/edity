@@ -14,8 +14,9 @@ export interface paths {
         /**
          * Log in
          * @description Starts logging in: redirects to Zitadel, with OIDC's authorization
-         *     code flow and PKCE (A1). The browser navigates here; the Editor does
-         *     not fetch it.
+         *     code flow and PKCE (A1), and asks the person to authenticate there
+         *     even if Zitadel already has a session for them. The browser navigates
+         *     here; the Editor does not fetch it.
          */
         readonly get: operations["login"];
         readonly put?: never;
@@ -166,7 +167,11 @@ export interface components {
         readonly Session: {
             /** @description The Client's name in Zitadel. */
             readonly name: string;
-            /** @description The Client's locale in Zitadel, such as `es` or `en-GB`, which the Editor's language follows (N6). */
+            /**
+             * @description The Client's locale in Zitadel, such as `es` or `en-GB`, which the
+             *     Editor's language follows (N6), or the Site's `locale` in the
+             *     Sites file when the Client has none.
+             */
             readonly locale: string;
             /** @description The Site's `id` in the server's Sites file, such as `edity-sandbox`. */
             readonly site: string;
@@ -332,8 +337,9 @@ export interface components {
             };
         };
         /**
-         * @description The request's `Origin` is not one of the Site's own, or it is a
-         *     `POST` without an `Origin` (A4).
+         * @description The request's `Origin` is not one of the Site's own, it is a `POST`
+         *     without an `Origin`, or it is a `GET` without an `Origin` whose
+         *     `Sec-Fetch-Site` says it comes from another origin (A4).
          */
         readonly ForeignOrigin: {
             headers: {
@@ -345,6 +351,15 @@ export interface components {
         };
         /** @description The hostname is not one of a configured Site's. */
         readonly UnknownSite: {
+            headers: {
+                readonly [name: string]: unknown;
+            };
+            content: {
+                readonly "text/plain": components["schemas"]["Message"];
+            };
+        };
+        /** @description Zitadel could not be reached, so the Client can't log in for now. No session. */
+        readonly ZitadelUnavailable: {
             headers: {
                 readonly [name: string]: unknown;
             };
@@ -368,8 +383,8 @@ export interface operations {
                  *     `/precios`, so the Client is back on the page whose Draft they were
                  *     editing (A3). Only a path on the Site's own origin counts: anything
                  *     that could lead elsewhere, such as `//other.example` or
-                 *     `https://other.example/`, counts as left out. The Site's home, `/`,
-                 *     when it is left out.
+                 *     `https://other.example/`, or is longer than 1024 bytes, counts as
+                 *     left out. The Site's home, `/`, when it is left out.
                  * @example /precios
                  */
                 readonly return?: string;
@@ -385,11 +400,18 @@ export interface operations {
                 headers: {
                     /** @description Zitadel's authorization endpoint, with the login's parameters. */
                     readonly Location: string;
+                    /**
+                     * @description The `edity_login` cookie that holds the login under way until
+                     *     Zitadel sends the browser back to `finishLogin`, for 10
+                     *     minutes. It is `HttpOnly` and scoped to the callback.
+                     */
+                    readonly "Set-Cookie": string;
                     readonly [name: string]: unknown;
                 };
                 content?: never;
             };
             readonly 404: components["responses"]["UnknownSite"];
+            readonly 503: components["responses"]["ZitadelUnavailable"];
         };
     };
     readonly finishLogin: {
@@ -417,8 +439,9 @@ export interface operations {
                     readonly Location: string;
                     /**
                      * @description The session cookie `edity_session`, `HttpOnly`, and the marker
-                     *     `edity=1`, both for 30 days (A2). The response has one
-                     *     `Set-Cookie` header for each.
+                     *     `edity=1`, both for 30 days (A2), and clears the login's
+                     *     `edity_login` cookie. The response has one `Set-Cookie` header
+                     *     for each.
                      */
                     readonly "Set-Cookie": string;
                     readonly [name: string]: unknown;
@@ -427,8 +450,9 @@ export interface operations {
             };
             /**
              * @description Not the end of a login this browser started: its `state` is
-             *     missing or not this browser's, it has no `code`, or Zitadel
-             *     answered an `error`. No session.
+             *     missing or not this browser's, the login took over 10 minutes,
+             *     it has no `code`, Zitadel answered an `error` or refused the
+             *     `code`, or what Zitadel answered does not check out. No session.
              */
             readonly 400: {
                 headers: {
@@ -438,7 +462,12 @@ export interface operations {
                     readonly "text/plain": components["schemas"]["Message"];
                 };
             };
-            /** @description The person who logged in does not have the Site's role, so is not one of its Clients. No session (A1). */
+            /**
+             * @description The person who logged in does not have the Site's role, so is not
+             *     one of its Clients, or Zitadel gives them no name, which every
+             *     Publish records. No session, and any session the browser had is
+             *     cleared (A1).
+             */
             readonly 403: {
                 headers: {
                     readonly [name: string]: unknown;
@@ -448,6 +477,7 @@ export interface operations {
                 };
             };
             readonly 404: components["responses"]["UnknownSite"];
+            readonly 503: components["responses"]["ZitadelUnavailable"];
         };
     };
     readonly logout: {
