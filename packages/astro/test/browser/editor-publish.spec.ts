@@ -67,6 +67,25 @@ async function holdPublish(
   return answer;
 }
 
+/**
+ * Serves the fixture page as `built` makes its HTML, from the next page load
+ * on: another build of it. Returns the function that changes what it makes.
+ */
+async function serveBuild(
+  page: Page,
+  built: (html: string) => string,
+): Promise<(next: (html: string) => string) => void> {
+  let current = built;
+  await page.route(
+    (url) => url.pathname === '/',
+    async (route) => {
+      const response = await route.fetch();
+      await route.fulfill({ response, body: current(await response.text()) });
+    },
+  );
+  return (next) => (current = next);
+}
+
 /** That a Publish's progress cannot be read, as the Client is told. */
 const progressUnknown =
   'No se puede comprobar ahora cómo va la publicación. Tus cambios están guardados.';
@@ -1017,6 +1036,64 @@ for (const [locale, message, button] of [
     ]);
   });
 }
+
+test('a Field published before its List moved is not put on the Item now at its index (P8)', async ({
+  page,
+  openEditor,
+  bar,
+  editor,
+}) => {
+  const api = await mockPublishApi(page);
+  api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+  api.status[sha] = stageOf('validating');
+  // Built with two Items that read the same.
+  const same = 'Fisioterapia deportiva';
+  const buildWith = await serveBuild(page, (html) =>
+    html.replaceAll('Suelo pélvico', same),
+  );
+  await openEditor();
+
+  await editAll(page, 'services.0');
+  await page.keyboard.type('Masaje');
+  await page.keyboard.press('Tab');
+  await publishButton(bar).click();
+  await expect(progress(editor)).toBeVisible();
+  await expect(bar.getByRole('status')).toHaveText('Sin cambios');
+
+  // With the first in progress, the Item it changed moves.
+  await focusField(page, 'services.0');
+  await editor.getByRole('button', { name: 'Bajar «Masaje»' }).click();
+  await expect(bar.getByRole('status')).toHaveText('1 cambio');
+  api.publish = { status: 202, json: { sha: newer, version: '1.4.4' } };
+  api.status[newer] = stageOf('validating', '1.4.4');
+  await publishButton(bar).click();
+  await expect(progress(editor)).toHaveAccessibleName(
+    'Publicación de la versión 1.4.4',
+  );
+  const services = [same, 'Masaje', 'Punción seca'];
+  const shown = async () => (await texts(page, 'services')).slice(0, 3);
+  await expect.poll(shown).toEqual(services);
+
+  // Neither is built yet: both are still put on the page.
+  await page.reload();
+  await expect(bar).toBeVisible();
+  await expect.poll(shown).toEqual(services);
+
+  // A build with both: the first Field is at its index again, reading what
+  // its Change had as the value before.
+  buildWith((html) => html.replaceAll('Suelo pélvico', 'Masaje'));
+  await page.reload();
+  await expect(bar).toBeVisible();
+
+  await expect.poll(shown).toEqual(services);
+  await expect(bar.getByRole('status')).toHaveText('Sin cambios');
+  await editAll(page, 'services.0');
+  await page.keyboard.type('Pilates');
+  await page.keyboard.press('Tab');
+  expect(await keptDraft(page)).toEqual([
+    { path: 'services.0', before: same, after: 'Pilates' },
+  ]);
+});
 
 test('an Item whose removal is published can no longer be put back (S6)', async ({
   page,

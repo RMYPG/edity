@@ -57,6 +57,55 @@ describe('stillToBuild', () => {
     ]);
   });
 
+  describe('a Field published before its List moved', () => {
+    const basic = { name: 'Básico', price: 45 };
+    const plus = { name: 'Plus', price: 45 };
+    const raised = { ...basic, price: 50 };
+    const price = publish('plans.0.price', 45, 50);
+    const swap = publish('plans', [raised, plus], [plus, raised]);
+
+    test('is built with the List once the List is', () => {
+      // `plans.0.price` is Plus now, and reads what the Change had before.
+      expect(stillToBuild({ plans: [plus, raised] }, [price, swap])).toEqual(
+        [],
+      );
+    });
+
+    test('is still to build with the List while neither is', () => {
+      expect(stillToBuild({ plans: [basic, plus] }, [price, swap])).toEqual([
+        price,
+        swap,
+      ]);
+    });
+
+    test('is built before the List when the build has only it', () => {
+      expect(stillToBuild({ plans: [raised, plus] }, [price, swap])).toEqual([
+        swap,
+      ]);
+    });
+
+    test('leaves a Change published after the List, still to build', () => {
+      const next = publish('plans.0.price', 45, 60);
+
+      expect(
+        stillToBuild({ plans: [plus, raised] }, [price, swap, next]),
+      ).toEqual([next]);
+    });
+  });
+
+  test('keeps a Change to another Field, whatever became of the rest', () => {
+    const title = publish('hero.title', 'A', 'B');
+    const price = publish('visit.price', 35, 40);
+
+    // The price was built, from an earlier Publish the server had already.
+    expect(
+      stillToBuild({ hero: { title: 'A' }, visit: { price: 40 } }, [
+        title,
+        price,
+      ]),
+    ).toEqual([title]);
+  });
+
   test('leaves the content as it was', () => {
     const content = { hero: { title: 'A' } };
 
