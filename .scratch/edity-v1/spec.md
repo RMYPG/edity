@@ -1,6 +1,6 @@
 # Edity v1: Inline Editor for Astro Sites
 
-Oct 11, 2026 · @Mario Rojas Padrón · revised Oct 12, 2026 after a design session
+Oct 11, 2026 · @Mario Rojas Padrón · revised Oct 12 and Nov 8, 2026 after design sessions
 
 Edity is a small inline editor that lets a Client change text, numbers and Lists directly on their own Astro landing page, without any control over styles. Each Publish is validated against the page's Field definitions and becomes one Git commit and a new Release of the Site. The Site stays fully static.
 
@@ -33,7 +33,7 @@ The tool exists so Clients stop asking you for small content changes, and so you
 
 ## Architecture in one paragraph
 
-Edity is made of two public repositories. `edity` is a TypeScript monorepo with three parts: `core` (the Field definition primitives and Draft validation), `astro` (the Astro integration and the Editor, built with Preact 11) and `contracts` (the content contract, which is also a Go module). These are published on npm as `@edity/*`, or as `@rmypg/edity-*` if the npm org name is taken. `edity-server` is a Go service running once in the cluster for every Site. Each Site's hostname routes `/_edity/login` and `/_edity/api/*` to it through Cloudflare Tunnel, and everything else under `/_edity/` is static files from the Site's own build. On Publish, the server reads the content and Field definitions from the Site repository at `main` HEAD, validates the Draft and commits on top of that sha. A workflow in the Site repository then cuts the Release once CI passes, and Flux deploys it. The server reports progress from GitHub and from rollout metrics in VictoriaMetrics, and stores no Publish state. Clients log in with Zitadel.
+Edity is made of two public repositories. `edity` is a TypeScript monorepo with three parts: `core` (the Field definition primitives and Draft validation), `astro` (the Astro integration and the Editor, built with Preact 11) and `contracts` (the content contract, which is also a Go module). These are published on npm as `@edity/*`, or as `@rmypg/edity-*` if the npm org name is taken. `edity-server` is a Go service running once in the cluster for every Site. Each Site's hostname routes `/_edity/login` and `/_edity/api/*` to it through Cloudflare Tunnel, and everything else under `/_edity/` is static files from the Site's own build. On Publish, the server reads the content and Field definitions from the Site repository at `main` HEAD, validates the Draft and commits on top of that sha. A workflow in the Site repository then cuts the Release once CI passes, and Flux deploys it. The server reports progress from GitHub, including the GitHub Deployment the platform writes for each rollout, and stores no Publish state. Clients log in with Zitadel.
 
 ## Scope
 
@@ -109,7 +109,7 @@ Must means version one is not usable without it. Should means it belongs in vers
 | P1 | Edits accumulate as a Draft; the bar shows the number of Changes, Discard and Publish | Must |
 | P2 | The Draft is kept in the browser and restored after a reload or a closed tab. Changes to Fields or Lists that no longer exist are dropped on restore, and the Client is told how many | Must |
 | P3 | Publish sends only the Changes, each with the value it had before | Must |
-| P4 | After Publish, the bar shows progress through Validating (CI on the commit), Releasing (Release being cut), Deploying and Live, or Failed. The page keeps showing the new values, and progress survives a reload | Must |
+| P4 | After Publish, the bar shows progress through Validating (CI on the commit), Releasing (Release being cut), Deploying (the API's `released` and `deploying`, shown as one step) and Live, or Failed. The page keeps showing the new values, and progress survives a reload | Must |
 | P5 | Every failure says what happened and that the Draft is safe, in the Client's language. If the Release fails after the commit, the Client is told the changes are saved but not live yet and that you have been notified | Must |
 | P6 | A phone-width preview shows the Draft at 390 px | Should |
 | P7 | A visitor view hides all Editor controls | Should |
@@ -126,7 +126,7 @@ Must means version one is not usable without it. Should means it belongs in vers
 | V5 | Publishing is rate-limited per Site | Should |
 | V6 | When a Release fails, the server opens or updates a GitHub issue on the Site repository | Must |
 | V7 | When a Publish ships Developer commits that are not content, the server notes it on a GitHub issue on the Site repository | Should |
-| V8 | Publish progress is worked out on each request from GitHub (checks, tags) and VictoriaMetrics (kube-state-metrics rollout), with no stored Publish state | Must |
+| V8 | Publish progress is worked out on each request from GitHub (checks, tags and Deployments), with no stored Publish state | Must |
 
 **Access**
 
@@ -150,7 +150,7 @@ Failed-login throttling is handled by Zitadel.
 | N5 | Works in current Chrome, Edge, Safari (including iOS) and Firefox 136 or later | Must |
 | N6 | The Editor's own text is translatable, with Spanish and English to start; its language follows the Client's Zitadel locale, independent of the Site's language | Should |
 | N7 | All controls are reachable by keyboard and labelled for screen readers | Should |
-| N8 | Adding Edity to a Site means: Migration, installing the `edity-publisher` GitHub App on the repository, adding the tunnel routes, adding the Site's Zitadel role and adding the Site entry to the server config in `platform` | Must |
+| N8 | Adding Edity to a Site means: Migration, installing the `edity-publisher` GitHub App on the repository, adding the `release-on-publish.yml` caller and its repository variable, adding the tunnel routes, adding the Site's Zitadel role and adding the Site entry to the server config in `platform` | Must |
 | N9 | The TS and Go validators pass the same conformance fixtures (JSON Schema Test Suite format) from `edity/contracts` | Must |
 | N10 | The server's HTTP API is described in OpenAPI, owned by `edity-server`; the Editor's client is generated from it | Must |
 | N11 | Pact consumer contracts from the Editor are verified in `edity-server`'s CI through the shared Pact Broker | Must |
@@ -166,7 +166,7 @@ All routes are on the Site's own origin.
 | `POST /_edity/api/auth/logout` | End the session and clear both cookies |
 | `GET /_edity/api/session` | The Client's name, locale and Site, or 401 |
 | `POST /_edity/api/publish` | `{ page, changes: [{ path, before, after }] }` returns `202 { sha, version, conflicts? }`, `409 { conflicts }` when nothing merged, `422 { violations }`, or `401` |
-| `GET /_edity/api/publish/:sha` | `{ stage: validating \| releasing \| released \| deploying \| live \| failed, version }` (`deploying` and `live` are on hold, ticket 33) |
+| `GET /_edity/api/publish/:sha` | `{ stage: validating \| releasing \| released \| deploying \| live \| failed, version }` (`deploying` and `live` come with ticket 33) |
 
 ## Build order
 
@@ -180,22 +180,22 @@ Each milestone ends with something you can try. Development publishes only to `R
 | M3. Contracts | `edity/contracts` Go module with the Edity vocabulary, meta-schema and conformance fixtures, passing in `core` | 1 day |
 | M4. Server | `edity-server` validates at HEAD, merges, commits and reports Conflicts and violations; it passes the conformance fixtures and verifies the Editor's pacts | 3 to 4 days |
 | M5. Publish experience | Zitadel login, progress until Live, the failure issue, phone preview; full loop on `edity-sandbox` | 2 days |
-| M6. Site pipeline | The release-on-Publish workflow lands in the template and `edity-sandbox`; `fisioindoor` is connected | 1 day |
+| M6. Site pipeline | The release-on-Publish workflow lands in the template, `edity-sandbox` and the shared workflows; `fisioindoor` is connected | 1 day |
 | M7. Device pass | Tested with Spanish accents and emoji, iOS Safari, Android Chrome, translation and grammar extensions | 1.5 to 2 days |
 
-The work is split into tickets in [`issues/`](issues/): 01 to 29 and 33 for v1, and 30 to 32 and 34 for the deferred backlog.
+The work is split into tickets in [`issues/`](issues/): 01 to 29, 33 and 35 for v1, and 30 to 32, 34 and 36 for the deferred backlog.
 
 Estimates are rough guesses for one developer, about 13 to 18 days in total. M2 is the experiment: it is where the time is best spent, and it can be shown to a Client before M4 exists.
 
 **Platform dependencies**
 
-On hold: the platform's deployment model is changing, so work focuses on the application itself. The deployment-side items below, and tickets 28 and 33, wait for the new model.
-
-- [RMYPG/platform#39](https://github.com/RMYPG/platform/issues/39): Flux image automation. M5's Deploying and Live stages only end once Releases deploy automatically.
+- [RMYPG/platform#39](https://github.com/RMYPG/platform/issues/39): Flux image automation. Done.
 - [RMYPG/platform#41](https://github.com/RMYPG/platform/issues/41): self-hosted Pact Broker, needed for N11 in M4.
-- [RMYPG/platform#42](https://github.com/RMYPG/platform/issues/42): deploying `edity-server`. It covers the gitops app, the tunnel routes per Site, the Zitadel project, roles and OIDC client, network access to `vmsingle`, and the GitHub App key as a secret. Needed for M5.
+- [RMYPG/platform#42](https://github.com/RMYPG/platform/issues/42): deploying `edity-server`. It covers the gitops app, the tunnel routes per Site, the Zitadel project, roles and OIDC client, and the GitHub App key as a secret. Needed for M5.
+- [RMYPG/platform#142](https://github.com/RMYPG/platform/issues/142): a reconciler that reports each rollout as a GitHub Deployment on the Site's repository. Needed for ticket 33.
+- [RMYPG/platform#143](https://github.com/RMYPG/platform/issues/143): a webhook Receiver that speeds up rollouts. Not a blocker: without it, a rollout can take up to about 20 minutes to start.
 
-**After v1:** a migration skill, written once `fisioindoor` and `vertex-glow` have both been migrated by hand.
+**After v1:** a migration skill, written once `fisioindoor` and `vertex-glow` have both been migrated by hand. Proposals, the Hub and live editing are specified in [`edity-v2`](../edity-v2/spec.md), to be shaped by what the `fisioindoor` pilot shows.
 
 ## Decisions
 
@@ -205,6 +205,8 @@ On hold: the platform's deployment model is changing, so work focuses on the app
 - [ADR-0004](../../docs/adr/0004-clients-log-in-with-zitadel-from-v1.md): Clients log in with Zitadel from version one
 - [ADR-0005](../../docs/adr/0005-save-service-in-go-in-its-own-repository.md): the server is written in Go, in its own repository
 - [ADR-0006](../../docs/adr/0006-mpl-for-the-packages-agpl-for-the-server.md): MPL-2.0 for the packages, AGPL-3.0 for the server
+
+Version two's decisions are [ADR-0007](../../docs/adr/0007-version-two-publishes-through-proposals-and-a-next-release.md) and [ADR-0008](../../docs/adr/0008-live-editing-shares-presence-and-whole-fields.md).
 
 ## Resolved questions
 
@@ -221,7 +223,7 @@ On hold: the platform's deployment model is changing, so work focuses on the app
 | Editor UI library | Preact 11 with signals, rendered into one shadow root |
 | npm scope | `@edity` if the npm org can be created, otherwise `@rmypg/edity-*` |
 | Licenses | MPL-2.0 for `edity` and its packages, AGPL-3.0 for `edity-server` except its OpenAPI file, which the Editor's client is generated from and is MPL-2.0 (ADR-0006) |
-| GitHub Apps | One: `edity-publisher`, installed on Site repositories (contents write, issues write, actions, checks and metadata read), with no webhook in v1: progress is polled, which keeps the server stateless and needs no public URL |
+| GitHub Apps | One: `edity-publisher`, installed on Site repositories (contents write, issues write, actions, checks, deployments and metadata read), with no webhook in v1: progress is polled, which keeps the server stateless and needs no public URL |
 
 ## Deferred backlog
 
