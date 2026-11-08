@@ -203,12 +203,34 @@ describe('publishedStore', () => {
 
     expect(storage.getItem('edity:published:v1:fixture:home')).toBeNull();
   });
+
+  test('keeps the commit of the Publish each one went in, and drops one that is not a commit', () => {
+    const storage = memory();
+    const published = publishedStore('fixture', 'home', () => storage);
+    const change = {
+      path: 'hero.title',
+      before: 'A',
+      after: 'B',
+      sha: 'a'.repeat(40),
+    };
+    const unknown = { path: 'visit.price', before: 35, after: 40 };
+
+    published.keep([change, unknown]);
+    expect(published.load()).toEqual([change, unknown]);
+
+    storage.items.set(
+      'edity:published:v1:fixture:home',
+      JSON.stringify({ changes: [{ ...change, sha: 'x' }, unknown] }),
+    );
+    expect(published.load()).toEqual([unknown]);
+  });
 });
 
 describe('progressStore', () => {
   const progress = {
     sha: 'a'.repeat(40),
     version: '1.4.3',
+    page: 'home',
     stage: 'releasing',
   } as const;
 
@@ -234,10 +256,17 @@ describe('progressStore', () => {
   test.each([
     ['what is not JSON', '{'],
     ['another shape', '{"sha":1}'],
-    ['a sha that is not one', '{"sha":"x","version":"1.0.0","stage":"failed"}'],
+    [
+      'a sha that is not one',
+      '{"sha":"x","version":"1.0.0","page":"home","stage":"failed"}',
+    ],
     [
       'a stage the Editor does not show',
-      `{"sha":"${'a'.repeat(40)}","version":"1.0.0","stage":"live"}`,
+      `{"sha":"${'a'.repeat(40)}","version":"1.0.0","page":"home","stage":"live"}`,
+    ],
+    [
+      'no page it published',
+      `{"sha":"${'a'.repeat(40)}","version":"1.0.0","stage":"failed"}`,
     ],
   ])('ignores %s', (_, kept) => {
     const storage = memory();

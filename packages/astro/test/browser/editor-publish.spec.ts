@@ -86,6 +86,22 @@ async function serveBuild(
   return (next) => (current = next);
 }
 
+/** Serves the fixture page at /otra too, as another page of the Site. */
+async function serveOtherPage(page: Page): Promise<void> {
+  await page.route('**/otra', async (route) => {
+    const home = new URL('/', route.request().url()).href;
+    const response = await route.fetch({ url: home });
+    const html = await response.text();
+    await route.fulfill({
+      response,
+      body: html.replace(
+        '&quot;page&quot;:&quot;home&quot;',
+        '&quot;page&quot;:&quot;otra&quot;',
+      ),
+    });
+  });
+}
+
 /** That a Publish's progress cannot be read, as the Client is told. */
 const progressUnknown =
   'No se puede comprobar ahora cómo va la publicación. Tus cambios están guardados.';
@@ -1093,6 +1109,79 @@ test('a Field published before its List moved is not put on the Item now at its 
   expect(await keptDraft(page)).toEqual([
     { path: 'services.0', before: same, after: 'Pilates' },
   ]);
+});
+
+test('a Publish that is lost forgets what it published on its own page, not on the one being looked at (P5)', async ({
+  page,
+  openEditor,
+  bar,
+  editor,
+}) => {
+  const api = await mockPublishApi(page);
+  await serveOtherPage(page);
+  api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+  api.status[sha] = stageOf('validating');
+  await openEditor();
+  await type(page, 'hero.title', 'Título de la portada');
+  await publishButton(bar).click();
+  await expect(progress(editor)).toBeVisible();
+
+  // Another page publishes, and the bar follows that one, on any page.
+  api.publish = { status: 202, json: { sha: newer, version: '1.4.4' } };
+  api.status[newer] = stageOf('validating', '1.4.4');
+  await page.goto('/otra');
+  await expect(bar).toBeVisible();
+  await expect(field(page, 'hero.title')).toHaveText(title);
+  await type(page, 'hero.title', 'Título de la otra');
+  await publishButton(bar).click();
+  await expect(progress(editor)).toHaveAccessibleName(
+    'Publicación de la versión 1.4.4',
+  );
+
+  // Back on the first page, the server no longer knows the one followed.
+  api.status[newer] = { status: 404 };
+  await page.goto('/');
+  await expect(bar).toBeVisible();
+  await expect(editor.getByRole('alert')).toBeVisible(nextPoll);
+  await expect(progress(editor)).toHaveCount(0);
+
+  // What this page published is on its way, so it still stands.
+  await page.reload();
+  await expect(bar).toBeVisible();
+  await expect(field(page, 'hero.title')).toHaveText('Título de la portada');
+
+  // What the lost one published is not, on the page it was published from.
+  await page.goto('/otra');
+  await expect(bar).toBeVisible();
+  await expect(field(page, 'hero.title')).toHaveText(title);
+});
+
+test('a Publish that is lost leaves what an earlier one published on the same page (P5, P8)', async ({
+  page,
+  openEditor,
+  bar,
+  editor,
+}) => {
+  const api = await mockPublishApi(page);
+  api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+  api.status[sha] = stageOf('validating');
+  await openEditor();
+  const lead = (await field(page, 'hero.lead').textContent())!.trim();
+  await type(page, 'hero.title', 'Otro título');
+  await publishButton(bar).click();
+  await expect(progress(editor)).toBeVisible();
+
+  await type(page, 'hero.lead', 'Otra entradilla');
+  api.publish = { status: 202, json: { sha: newer, version: '1.4.4' } };
+  api.status[newer] = { status: 404 };
+  await publishButton(bar).click();
+  await expect(editor.getByRole('alert')).toBeVisible(nextPoll);
+
+  await page.reload();
+  await expect(bar).toBeVisible();
+
+  await expect(field(page, 'hero.title')).toHaveText('Otro título');
+  await expect(field(page, 'hero.lead')).toHaveText(lead);
 });
 
 test('an Item whose removal is published can no longer be put back (S6)', async ({

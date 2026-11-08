@@ -70,7 +70,7 @@ async function start(): Promise<void> {
         publishing: startPublishing(
           { state, fields, lists },
           {
-            published: page && publishedStore(result.session.site, page.page),
+            published: (name) => publishedStore(result.session.site, name),
             progress: progressStore(result.session.site),
             loginReturn: loginReturnStore(result.session.site),
           },

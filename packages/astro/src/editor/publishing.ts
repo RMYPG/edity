@@ -24,12 +24,12 @@ import type { PageMarker } from '../editable.js';
 import { fitsDraft, setValueAt } from './content.js';
 import type { Change } from './draft.js';
 import type {
-  DraftStore,
   LoginReturnStore,
   ProgressStore,
+  PublishedStore,
 } from './draft-store.js';
 import type { PublishNotice } from './publish-i18n.js';
-import { stillToBuild } from './published.js';
+import { stillToBuild, type CommittedChange } from './published.js';
 import { rejectedMarks } from './rejected.js';
 import { showDraft } from './show-draft.js';
 import type { Editing } from './state.js';
@@ -54,6 +54,8 @@ export type ShownStage = 'validating' | 'releasing' | 'released' | 'failed';
 export interface Progress {
   readonly sha: string;
   readonly version: string;
+  /** The page it published: any page of the Site can follow it. */
+  readonly page: string;
   readonly stage: ShownStage;
 }
 
@@ -83,8 +85,8 @@ export interface Publishing {
 
 /** Where the Editor keeps its Publishes in the browser. */
 export interface PublishingStores {
-  /** The page's published Changes, on a page with something to edit. */
-  readonly published: DraftStore | undefined;
+  /** Where each page's published Changes are kept, by the page's name. */
+  published(page: string): PublishedStore;
   readonly progress: ProgressStore;
   readonly loginReturn: LoginReturnStore;
 }
@@ -106,8 +108,9 @@ export function startPublishing(
     stores.loginReturn.take() ? { kind: 'signed-back-in' } : undefined,
   );
   const rejected = rejectedMarks(document);
+  const pageStore = page && stores.published(page.page);
   /** The Changes published that the page as built may not hold yet. */
-  let published: readonly Change[] = [];
+  let published: readonly CommittedChange[] = [];
   /** The Draft a notice is about: it goes once the Draft changes. */
   let noticed = draft.changes.peek();
   let timer = 0;
@@ -126,16 +129,31 @@ export function startPublishing(
     lists.settle(changes.map(({ path }) => path));
   }
 
-  /** Takes `changes`, which the server now holds, out of the Draft for good. */
-  function keepPublished(changes: readonly Change[]): void {
+  /**
+   * Takes `changes`, which the server now holds, out of the Draft for good.
+   * `sha` is the commit they went in, when the server said.
+   */
+  function keepPublished(changes: readonly Change[], sha?: string): void {
     // The content first: the phone preview puts each Change that leaves the
     // Draft back as the content has it.
     batch(() => {
       settle(changes);
       for (const { path } of changes) draft.remove(path);
     });
-    published = [...published, ...changes];
-    stores.published?.keep(published);
+    published = [...published, ...changes.map((each) => ({ ...each, sha }))];
+    pageStore?.keep(published);
+  }
+
+  /**
+   * Forgets the Changes the Publish `lost` made, which are kept for the page
+   * it published, whichever page the Client is on now. Those of any other
+   * Publish stay.
+   */
+  function forgetPublished(lost: Progress): void {
+    const others = ({ sha }: CommittedChange) => sha !== lost.sha;
+    published = published.filter(others);
+    const store = stores.published(lost.page);
+    store.keep(store.load().filter(others));
   }
 
   /** Tells the Client `next`, until they close it or change the Draft. */
@@ -179,10 +197,9 @@ export function startPublishing(
       }
       case 'not-found':
         // Not a Publish on the Site, perhaps no longer: there is nothing to
-        // follow, and what was published is not on its way to the page, so
-        // the next page load shows it without that.
-        published = [];
-        stores.published?.keep(published);
+        // follow, and what it published is not on its way to its page, so
+        // that page's next load shows it without that.
+        forgetPublished(followed);
         show(undefined);
         tell({ kind: 'lost' });
         return;
@@ -212,11 +229,16 @@ export function startPublishing(
     const result = await publish(publishRequest(page.page, changes));
     switch (result.status) {
       case 'published':
-        keepPublished(merged(result.conflicts));
+        keepPublished(merged(result.conflicts), result.sha);
         if (result.conflicts.length > 0) conflicted(result.conflicts, true);
         unreadable = 0;
         progressUnknown.value = false;
-        show({ sha: result.sha, version: result.version, stage: 'validating' });
+        show({
+          sha: result.sha,
+          version: result.version,
+          page: page.page,
+          stage: 'validating',
+        });
         follow(pollEvery);
         return;
       case 'conflicts':
@@ -243,12 +265,12 @@ export function startPublishing(
   // What an earlier page load left: the Changes it published, which go on the
   // page before the Draft does, and the Publish it followed.
   if (page !== undefined) {
-    const kept = stores.published?.load() ?? [];
+    const kept = pageStore?.load() ?? [];
     published = stillToBuild(
       page.content,
       kept.filter((change) => fitsDraft(page.fields, change)),
     );
-    if (published.length !== kept.length) stores.published?.keep(published);
+    if (published.length !== kept.length) pageStore?.keep(published);
     showDraft({ fields, lists }, published);
     settle(published);
   }

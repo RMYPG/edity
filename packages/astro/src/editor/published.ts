@@ -5,6 +5,15 @@ import { isWithin } from '../paths.js';
 import { sameValue, setValueAt, valueAt } from './content.js';
 import type { Change } from './draft.js';
 
+/** A Change the server holds, as the Editor keeps it until it is built. */
+export interface CommittedChange extends Change {
+  /**
+   * The commit of the Publish it went in, when the server said: a 409 does
+   * not, of a Change it already had.
+   */
+  readonly sha?: string;
+}
+
 /**
  * Those of `published`, in the order they were published, that a page built
  * from `content` does not hold yet: each one whose `before` is still there,

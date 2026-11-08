@@ -6,6 +6,7 @@
 // ever throws, and what cannot be kept is only in memory.
 import { effect, untracked } from '@preact/signals';
 import type { Change, ContentValue, Draft } from './draft.js';
+import type { CommittedChange } from './published.js';
 import type { Progress } from './publishing.js';
 
 /** The part of the browser's `Storage` the Draft is kept in. */
@@ -14,20 +15,26 @@ export type KeptStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
 /** The browser's own storage, which may throw when it is blocked. */
 const browserStorage = (): KeptStorage => window.localStorage;
 
-/** Where one page's Changes are kept. */
-export interface DraftStore {
+/** Where one page's Changes of some kind are kept. */
+interface ChangeStore<T extends Change> {
   /**
    * The Changes kept for the page, in the order the Client made them. None
    * when there are none, or what is kept cannot be read.
    */
-  load(): Change[];
+  load(): T[];
   /** Keeps `changes` for the page, or forgets its Draft when there are none. */
-  keep(changes: Iterable<Change>): void;
+  keep(changes: Iterable<T>): void;
 }
 
+/** Where one page's Draft is kept. */
+export type DraftStore = ChangeStore<Change>;
+
+/** Where the Changes one page has published are kept. */
+export type PublishedStore = ChangeStore<CommittedChange>;
+
 /** What is kept under a Draft's key, as JSON. */
-interface Kept {
-  readonly changes: readonly Change[];
+interface Kept<T extends Change> {
+  readonly changes: readonly T[];
 }
 
 /**
@@ -40,7 +47,7 @@ export function draftStore(
   page: string,
   storage: () => KeptStorage = browserStorage,
 ): DraftStore {
-  return changeStore(pageKey('draft', site, page), storage);
+  return changeStore(pageKey('draft', site, page), storage, isChange);
 }
 
 /**
@@ -51,15 +58,23 @@ export function publishedStore(
   site: string,
   page: string,
   storage: () => KeptStorage = browserStorage,
-): DraftStore {
-  return changeStore(pageKey('published', site, page), storage);
+): PublishedStore {
+  return changeStore(
+    pageKey('published', site, page),
+    storage,
+    isCommittedChange,
+  );
 }
 
 function pageKey(kind: string, site: string, page: string): string {
   return `edity:${kind}:v1:${encodeURIComponent(site)}:${encodeURIComponent(page)}`;
 }
 
-function changeStore(key: string, storage: () => KeptStorage): DraftStore {
+function changeStore<T extends Change>(
+  key: string,
+  storage: () => KeptStorage,
+  isKept: (value: unknown) => value is T,
+): ChangeStore<T> {
   return {
     load() {
       let kept: unknown;
@@ -71,14 +86,14 @@ function changeStore(key: string, storage: () => KeptStorage): DraftStore {
       if (
         typeof kept !== 'object' ||
         kept === null ||
-        !Array.isArray((kept as Partial<Kept>).changes)
+        !Array.isArray((kept as Partial<Kept<T>>).changes)
       ) {
         return [];
       }
-      return (kept as Kept).changes.filter(isChange);
+      return (kept as Kept<T>).changes.filter(isKept);
     },
     keep(changes) {
-      const kept: Kept = { changes: [...changes] };
+      const kept: Kept<T> = { changes: [...changes] };
       try {
         if (kept.changes.length === 0) storage().removeItem(key);
         else storage().setItem(key, JSON.stringify(kept));
@@ -187,13 +202,23 @@ function isChange(value: unknown): value is Change {
   );
 }
 
+function isCommittedChange(value: unknown): value is CommittedChange {
+  if (!isChange(value)) return false;
+  const { sha } = value as CommittedChange;
+  return sha === undefined || isSha(sha);
+}
+
+function isSha(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
+}
+
 function isProgress(value: unknown): value is Progress {
   if (typeof value !== 'object' || value === null) return false;
-  const { sha, version, stage } = value as Record<string, unknown>;
+  const { sha, version, page, stage } = value as Record<string, unknown>;
   return (
-    typeof sha === 'string' &&
-    /^[0-9a-f]{40}$/.test(sha) &&
+    isSha(sha) &&
     typeof version === 'string' &&
+    typeof page === 'string' &&
     (stage === 'validating' ||
       stage === 'releasing' ||
       stage === 'released' ||
