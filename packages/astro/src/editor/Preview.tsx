@@ -12,8 +12,8 @@ import { Counters } from './Counters.js';
 import { editorRoot, readPage } from './documents.js';
 import type { Change } from './draft.js';
 import type { Messages } from './i18n.js';
-import { adoptSheet } from './sheets.js';
 import { stillToBuild } from './published.js';
+import { adoptSheet } from './sheets.js';
 import { draftDelta, showDraft } from './show-draft.js';
 import type { Editing } from './state.js';
 

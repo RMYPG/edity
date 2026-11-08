@@ -14,10 +14,13 @@ import {
   texts,
 } from './editor.js';
 
+// Some follow a Publish through several polls, 5 seconds apart.
+test.describe.configure({ timeout: 60_000 });
+
 /** A Publish's commit. */
 const sha = 'a'.repeat(40);
 
-/** The fixture page's title and lead as built. */
+/** The fixture page's title as built. */
 const title = 'Fisioterapia que te devuelve el movimiento';
 
 /** How long a poll can take to come: the Editor asks every 5 seconds. */
@@ -786,7 +789,6 @@ test('when the progress cannot be read, the bar keeps its stage and says so, and
   bar,
   editor,
 }) => {
-  test.setTimeout(60_000);
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = { status: 503, headers: { 'Retry-After': '1' } };

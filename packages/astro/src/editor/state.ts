@@ -33,7 +33,8 @@ export interface EditorState {
   readonly session: Session;
   /**
    * What the page's `data-edity-page` marker holds: its name, Field
-   * definitions and built content. `undefined` on a page with nothing to edit.
+   * definitions and built content, which also takes each Publish as the page
+   * shows it (`startPublishing`). `undefined` on a page with nothing to edit.
    */
   readonly page: PageMarker | undefined;
   /** The Editor's language. */
