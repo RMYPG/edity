@@ -210,6 +210,15 @@ describe('what a Publish came to (P5)', () => {
     expect(en.notice({ kind: message.kind })).toBe(message.en);
   });
 
+  test('says when the server no longer knows the Publish it followed', () => {
+    expect(es.notice({ kind: 'lost' })).toBe(
+      'No se puede seguir esta publicación porque la web ya no la reconoce, así que esos cambios pueden no llegar a verse. Recarga la página para ver lo que hay publicado y avisa a quien mantiene tu web. Tu borrador está a salvo.',
+    );
+    expect(en.notice({ kind: 'lost' })).toBe(
+      "This Publish can't be followed because the site no longer knows it, so those changes may not go live. Reload the page to see what is published, and tell your developer. Your draft is safe.",
+    );
+  });
+
   test("says when a Publish's progress can't be read", () => {
     expect(es.progressUnknown).toBe(
       'No se puede comprobar ahora cómo va la publicación. Tus cambios están guardados.',

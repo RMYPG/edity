@@ -43,7 +43,11 @@ export function Editor({ editing }: Props) {
           <Bar editing={editing} focus={focus} preview={preview} />
           <PublishProgress editing={editing} />
           <Counters limits={limits} t={state.t} />
-          <div class="notices">
+          <div
+            class={
+              lists.controls.removed.value ? 'notices above-undo' : 'notices'
+            }
+          >
             <PublishNotices editing={editing} />
             <NotApplied state={state} />
           </div>

@@ -167,6 +167,7 @@ button:focus-visible {
   display: flex;
   align-items: center;
   gap: 10px;
+  width: max-content;
   max-width: calc(100% - 16px);
   padding: 4px 8px 4px 12px;
   border-radius: 10px;
@@ -180,12 +181,6 @@ button:focus-visible {
   padding: 0 10px;
   font-size: 13px;
   box-shadow: inset 0 0 0 1px var(--edity-line);
-}
-
-.progress-note {
-  color: var(--edity-muted);
-  font-size: 13px;
-  line-height: 18px;
 }
 
 .steps {
@@ -229,8 +224,7 @@ button:focus-visible {
   background: #ffffff;
 }
 
-/* Above the bar, where the List controls' Undo also shows: a notice goes
-   once the Client changes the Draft, before any Item can be removed. */
+/* Above the bar, and above the List controls' Undo while it shows there. */
 .notices {
   position: fixed;
   z-index: 2147483647;
@@ -243,6 +237,11 @@ button:focus-visible {
   width: max-content;
   max-width: min(560px, calc(100% - 16px));
   transform: translateX(-50%);
+}
+
+/* The Undo is 48 px tall, and the notices keep their gap to it. */
+.above-undo {
+  bottom: calc(var(--edity-above-bar) + 54px + env(safe-area-inset-bottom));
 }
 
 .notice {

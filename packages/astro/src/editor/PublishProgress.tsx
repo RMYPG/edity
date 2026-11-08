@@ -14,7 +14,7 @@ const steps: readonly ShownStage[] = ['validating', 'releasing', 'released'];
 export function PublishProgress({ editing }: Props) {
   const { publishing, state } = editing;
   const { t } = state;
-  const { stages, progress: name, progressUnknown } = t.publishing;
+  const { stages, progress: name } = t.publishing;
   const progress = publishing.progress.value;
   if (progress === undefined) return null;
   const { stage, version } = progress;
@@ -27,9 +27,6 @@ export function PublishProgress({ editing }: Props) {
           </li>
         ))}
       </ol>
-      {publishing.progressUnknown.value && (
-        <span class="progress-note">{progressUnknown}</span>
-      )}
       {hasEnded(stage) && (
         <button type="button" onClick={() => publishing.closeProgress()}>
           {t.dismiss}
@@ -41,18 +38,24 @@ export function PublishProgress({ editing }: Props) {
 
 /**
  * What went wrong: the last Publish's answer, until the Client closes it or
- * changes the Draft, and a failed Release, while the bar shows it (P5).
+ * changes the Draft, and, while the bar shows them, a failed Release and
+ * that the progress can't be read (P5).
  */
 export function PublishNotices({ editing }: Props) {
   const { publishing, state } = editing;
   const { t } = state;
   const notice = publishing.notice.value;
-  const failed = publishing.progress.value?.stage === 'failed';
+  const progress = publishing.progress.value;
   return (
     <>
-      {failed && (
+      {progress?.stage === 'failed' && (
         <div class="notice" role="alert">
           <span>{t.releaseFailed}</span>
+        </div>
+      )}
+      {progress !== undefined && publishing.progressUnknown.value && (
+        <div class="notice" role="status">
+          <span>{t.publishing.progressUnknown}</span>
         </div>
       )}
       {notice !== undefined && (

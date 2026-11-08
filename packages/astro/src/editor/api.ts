@@ -58,6 +58,21 @@ export async function getSession(): Promise<SessionResult> {
   return { status: 'signed-in', session: data };
 }
 
+type LoginCall = paths['/_edity/login']['get'];
+
+/**
+ * Where to send the browser to log in and come back to the path `back` (A3).
+ * The browser navigates there: the Editor does not fetch it.
+ */
+export function loginUrl(back: string): string {
+  // `satisfies` keeps the route and its parameter in the file.
+  const route = '/_edity/login' satisfies keyof paths;
+  const parameter = 'return' satisfies keyof NonNullable<
+    LoginCall['parameters']['query']
+  >;
+  return `${route}?${parameter}=${encodeURIComponent(back)}`;
+}
+
 /**
  * What `POST /_edity/api/publish` takes (P3): the page, and only the Draft's
  * Changes, each with its value before and after.

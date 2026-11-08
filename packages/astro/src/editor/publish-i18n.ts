@@ -26,7 +26,9 @@ export type PublishNotice =
       readonly marked: boolean;
     }
   /** The Client is back from logging in, as their session had expired. */
-  | { readonly kind: 'signed-back-in' };
+  | { readonly kind: 'signed-back-in' }
+  /** The Publish the bar followed is not one on the Site, or no longer. */
+  | { readonly kind: 'lost' };
 
 /** Every text about a Publish that the Editor shows or gives screen readers. */
 export interface PublishMessages {
@@ -80,6 +82,8 @@ export const publishMessages: Readonly<Record<Locale, PublishMessages>> = {
             : `No se ha publicado: ${notice.count} valores no cumplen los límites de la web. Están marcados en rojo: corrígelos y vuelve a publicar. ${safe}`;
         case 'signed-back-in':
           return 'Tu sesión había caducado y has vuelto a entrar. Tu borrador está a salvo: pulsa Publicar para enviarlo.';
+        case 'lost':
+          return `No se puede seguir esta publicación porque la web ya no la reconoce, así que esos cambios pueden no llegar a verse. Recarga la página para ver lo que hay publicado y avisa a quien mantiene tu web. ${safe}`;
         case 'rate-limited': {
           const wait =
             notice.retryAfter === undefined
@@ -133,6 +137,8 @@ export const publishMessages: Readonly<Record<Locale, PublishMessages>> = {
             : `Nothing was published: ${notice.count} values break the site's limits. They are marked in red: fix them and publish again. ${safe}`;
         case 'signed-back-in':
           return 'Your session had expired and you have logged in again. Your draft is safe: press Publish to send it.';
+        case 'lost':
+          return `This Publish can't be followed because the site no longer knows it, so those changes may not go live. Reload the page to see what is published, and tell your developer. ${safe}`;
         case 'rate-limited': {
           const wait =
             notice.retryAfter === undefined

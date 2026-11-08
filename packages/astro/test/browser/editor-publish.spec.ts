@@ -12,6 +12,7 @@ import {
   mockPublishApi,
   test,
   texts,
+  type MockPublishApi,
 } from './editor.js';
 
 // Some follow a Publish through several polls, 5 seconds apart.
@@ -49,6 +50,26 @@ const newer = 'b'.repeat(40);
 function stageOf(stage: string, version = '1.4.3') {
   return { status: 200, json: { stage, version } };
 }
+
+/** Holds the next Publish until the function it returns is called: a 202. */
+async function holdPublish(
+  page: Page,
+  api: MockPublishApi,
+): Promise<() => void> {
+  let answer: () => void = () => {};
+  const answered = new Promise<void>((resolve) => (answer = resolve));
+  await page.unroute('**/_edity/api/publish');
+  await page.route('**/_edity/api/publish', async (route) => {
+    api.published.push(route.request().postDataJSON());
+    await answered;
+    await route.fulfill({ status: 202, json: { sha, version: '1.4.3' } });
+  });
+  return answer;
+}
+
+/** That a Publish's progress cannot be read, as the Client is told. */
+const progressUnknown =
+  'No se puede comprobar ahora cómo va la publicación. Tus cambios están guardados.';
 
 test('Publish sends the Draft, and the bar follows it through each stage (P3, P4)', async ({
   page,
@@ -670,14 +691,7 @@ test('while the Draft is on its way, nothing on the page can change and Publish 
   editor,
 }) => {
   const api = await mockPublishApi(page);
-  let answer: () => void = () => {};
-  const answered = new Promise<void>((resolve) => (answer = resolve));
-  await page.unroute('**/_edity/api/publish');
-  await page.route('**/_edity/api/publish', async (route) => {
-    api.published.push(route.request().postDataJSON());
-    await answered;
-    await route.fulfill({ status: 202, json: { sha, version: '1.4.3' } });
-  });
+  const answer = await holdPublish(page, api);
   api.status[sha] = stageOf('validating');
   await openEditor();
   await type(page, 'hero.title', 'Otro título');
@@ -698,6 +712,49 @@ test('while the Draft is on its way, nothing on the page can change and Publish 
     'plaintext-only',
   );
   expect(api.published).toHaveLength(1);
+});
+
+test('while the Draft is on its way, an empty List offers no way to add to it (S1)', async ({
+  page,
+  signIn,
+  bar,
+  editor,
+}) => {
+  // The fixture's services take 1 to 8 Items: this page's take 0 to 8.
+  await page.route('/', async (route) => {
+    const response = await route.fetch();
+    const html = (await response.text()).replace(
+      /(&quot;services&quot;:\{&quot;kind&quot;:&quot;list&quot;,&quot;limits&quot;:\{&quot;min&quot;:)1/,
+      (_, start: string) => `${start}0`,
+    );
+    await route.fulfill({ response, body: html });
+  });
+  const api = await mockPublishApi(page);
+  const answer = await holdPublish(page, api);
+  api.status[sha] = stageOf('validating');
+  await signIn();
+  await page.goto('/');
+  await expect(bar).toBeVisible();
+  for (const service of await texts(page, 'services')) {
+    await focusField(page, 'services.0');
+    await editor.getByRole('button', { name: `Quitar «${service}»` }).click();
+  }
+  await page.getByRole('heading', { name: 'Bonos' }).click();
+  const add = editor.getByRole('button', {
+    name: 'Añadir elemento',
+    exact: true,
+  });
+  await expect(add).toBeVisible();
+
+  await publishButton(bar).click();
+
+  await expect(publishButton(bar, 'Publicando…')).toBeDisabled();
+  await expect(add).toHaveCount(0);
+
+  answer();
+
+  await expect(add).toBeVisible();
+  await expect(bar.getByRole('status')).toHaveText('Sin cambios');
 });
 
 test('a failed Release says the changes are saved and the Developer told, also after a reload (P5)', async ({
@@ -761,6 +818,66 @@ test('a Publish that fails and is then covered by a newer Release shows it after
   await expect(editor.getByRole('alert')).toHaveCount(0);
 });
 
+test('a failed Publish that a newer Release covers shows it without a reload (P8)', async ({
+  page,
+  openEditor,
+  bar,
+  editor,
+}) => {
+  await page.clock.install();
+  const api = await mockPublishApi(page);
+  api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+  api.status[sha] = stageOf('failed');
+  await openEditor();
+  await type(page, 'hero.title', 'Otro título');
+  await publishButton(bar).click();
+  await expect(progress(editor)).toBeVisible();
+  const current = progress(editor).locator('[aria-current="step"]');
+
+  await page.clock.fastForward(5_000);
+  await expect(current).toHaveText('Ha fallado');
+  await expect(editor.getByRole('alert')).toBeVisible();
+
+  // Nothing comes of it soon, so it is not asked as often as one under way.
+  api.status[sha] = stageOf('released');
+  const asked = api.asked.get(sha);
+  await page.clock.fastForward(20_000);
+  await page.waitForTimeout(1_000);
+  expect(api.asked.get(sha)).toBe(asked);
+
+  await page.clock.fastForward(10_000);
+
+  await expect(current).toHaveText('Versión creada');
+  await expect(editor.getByRole('alert')).toHaveCount(0);
+});
+
+test('the alert of a failed Release leaves the Undo of a removed Item within reach (S6)', async ({
+  page,
+  openEditor,
+  bar,
+  editor,
+}) => {
+  const api = await mockPublishApi(page);
+  api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+  api.status[sha] = stageOf('failed');
+  await openEditor();
+  await type(page, 'hero.title', 'Otro título');
+  await publishButton(bar).click();
+  await expect(progress(editor).locator('[aria-current="step"]')).toHaveText(
+    'Ha fallado',
+    nextPoll,
+  );
+  const services = await texts(page, 'services');
+
+  await focusField(page, 'services.3');
+  await editor.getByRole('button', { name: `Quitar «${services[3]}»` }).click();
+  // A click needs the button to be what is at that point of the window.
+  await editor.getByRole('button', { name: 'Deshacer' }).click();
+
+  await expect.poll(() => texts(page, 'services')).toEqual(services);
+  await expect(editor.getByRole('alert')).toBeVisible();
+});
+
 for (const stage of ['deploying', 'live']) {
   test(`the server's ${stage}, which comes with ticket 33, shows as Released`, async ({
     page,
@@ -799,9 +916,7 @@ test('when the progress cannot be read, the bar keeps its stage and says so, and
 
   const current = progress(editor).locator('[aria-current="step"]');
   await expect(current).toHaveText('Validando');
-  const unknown = progress(editor).getByText(
-    'No se puede comprobar ahora cómo va la publicación. Tus cambios están guardados.',
-  );
+  const unknown = editor.getByText(progressUnknown);
   // Only once it has failed twice: a moment's 503 is not worth a word.
   await expect(unknown).toBeVisible({ timeout: 20_000 });
 
@@ -825,36 +940,83 @@ test('a session that ends while the progress is followed says so, and stops aski
 
   await publishButton(bar).click();
 
-  await expect(
-    progress(editor).getByText(
-      'No se puede comprobar ahora cómo va la publicación. Tus cambios están guardados.',
-    ),
-  ).toBeVisible(nextPoll);
+  await expect(editor.getByText(progressUnknown)).toBeVisible(nextPoll);
   const asked = api.asked.get(sha);
   await page.waitForTimeout(6_000);
   expect(api.asked.get(sha)).toBe(asked);
 });
 
-test('a commit the server does not know as a Publish stops being followed', async ({
+test('the progress takes one line, under the notices, on any screen (P4)', async ({
   page,
   openEditor,
   bar,
   editor,
 }) => {
   const api = await mockPublishApi(page);
-  api.publish = { status: 202, json: { sha, version: '1.4.3' } };
-  api.status[sha] = { status: 404 };
+  api.publish = {
+    status: 202,
+    json: { sha, version: '1.4.3', conflicts: [{ path: 'hero.title' }] },
+  };
+  api.status[sha] = { status: 401 };
   await openEditor();
   await type(page, 'hero.title', 'Otro título');
+  await type(page, 'visit.price', '40');
 
   await publishButton(bar).click();
-  await expect(progress(editor)).toBeVisible();
 
-  await expect(progress(editor)).toHaveCount(0, nextPoll);
-  await page.reload();
-  await expect(bar).toBeVisible();
-  await expect(progress(editor)).toHaveCount(0);
+  await expect(editor.getByText(progressUnknown)).toBeVisible(nextPoll);
+  await expect(editor.getByRole('alert')).toBeVisible();
+  const box = (await progress(editor).boundingBox())!;
+  expect(box.height).toBeLessThanOrEqual(36);
+  for (const notice of await editor.locator('.notice').all()) {
+    const { y, height } = (await notice.boundingBox())!;
+    expect(y + height).toBeLessThanOrEqual(box.y);
+  }
 });
+
+for (const [locale, message, button] of [
+  [
+    'es',
+    'No se puede seguir esta publicación porque la web ya no la reconoce, así que esos cambios pueden no llegar a verse. Recarga la página para ver lo que hay publicado y avisa a quien mantiene tu web. Tu borrador está a salvo.',
+    'Publicar',
+  ],
+  [
+    'en',
+    "This Publish can't be followed because the site no longer knows it, so those changes may not go live. Reload the page to see what is published, and tell your developer. Your draft is safe.",
+    'Publish',
+  ],
+] as const) {
+  test(`a commit the server does not know as a Publish stops being followed, and says so in ${locale} (P5)`, async ({
+    page,
+    openEditor,
+    bar,
+    editor,
+  }) => {
+    const api = await mockPublishApi(page);
+    api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+    api.status[sha] = { status: 404 };
+    await openEditor({ session: { ...ana, locale } });
+    await type(page, 'hero.title', 'Otro título');
+
+    await publishButton(bar, button).click();
+    await expect(progress(editor)).toBeVisible();
+
+    await expect(progress(editor)).toHaveCount(0, nextPoll);
+    await expect(editor.getByRole('alert').locator('span')).toHaveText(message);
+
+    // Told once, and what it published no longer stands on the page: the
+    // next Change's value before is the one the page was built with.
+    await page.reload();
+    await expect(bar).toBeVisible();
+    await expect(progress(editor)).toHaveCount(0);
+    await expect(editor.getByRole('alert')).toHaveCount(0);
+    await expect(field(page, 'hero.title')).toHaveText(title);
+    await type(page, 'hero.title', 'Tercer título');
+    expect(await keptDraft(page)).toEqual([
+      { path: 'hero.title', before: title, after: 'Tercer título' },
+    ]);
+  });
+}
 
 test('an Item whose removal is published can no longer be put back (S6)', async ({
   page,

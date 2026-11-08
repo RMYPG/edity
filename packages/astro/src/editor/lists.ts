@@ -719,6 +719,8 @@ function editPage(
   function shown(): Shown {
     // The controls measure the page each time it may have changed.
     void layout.value;
+    // While the Draft is on its way, nothing on the page can change.
+    if (view.value !== 'edit') return { lists: [], item: undefined };
     const current = active.value?.isConnected ? active.value : undefined;
     // The active Item's outer List and the Lists in it, and every empty
     // List, which has no Item to make active.

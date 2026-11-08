@@ -15,6 +15,7 @@ import {
 } from '@preact/signals';
 import {
   getPublishStatus,
+  loginUrl,
   publish,
   publishRequest,
   type PublishStatus,
@@ -38,6 +39,13 @@ import type { Editing } from './state.js';
  * same to anything sooner.
  */
 const pollEvery = 5000;
+
+/**
+ * How often to ask about a Publish that failed, in ms. A newer Release that
+ * contains its commit makes it `released`, so it is not over, but that takes
+ * someone doing something.
+ */
+const pollFailedEvery = 30_000;
 
 /** A stage as the Editor shows it. */
 export type ShownStage = 'validating' | 'releasing' | 'released' | 'failed';
@@ -164,12 +172,19 @@ export function startPublishing(
         progressUnknown.value = false;
         const stage = shownStage(result.stage);
         show({ ...followed, stage });
-        if (!hasEnded(stage)) follow(pollEvery);
+        if (stage !== 'released') {
+          follow(stage === 'failed' ? pollFailedEvery : pollEvery);
+        }
         return;
       }
       case 'not-found':
-        // Not a Publish the server knows, so there is nothing to follow.
+        // Not a Publish on the Site, perhaps no longer: there is nothing to
+        // follow, and what was published is not on its way to the page, so
+        // the next page load shows it without that.
+        published = [];
+        stores.published?.keep(published);
         show(undefined);
+        tell({ kind: 'lost' });
         return;
       case 'signed-out':
         // Back on the next page load, once logged in again.
@@ -187,9 +202,7 @@ export function startPublishing(
   /** Sends the Client to log in, to come back to this page (A3). */
   function sendToLogin(): void {
     stores.loginReturn.mark();
-    location.assign(
-      `/_edity/login?return=${encodeURIComponent(location.pathname)}`,
-    );
+    location.assign(loginUrl(location.pathname));
   }
 
   async function send(page: PageMarker): Promise<void> {
@@ -278,7 +291,7 @@ export function startPublishing(
   };
 }
 
-/** Whether nothing more will come of a Publish at `stage` by itself. */
+/** Whether the Client can close the progress of a Publish at `stage`. */
 export function hasEnded(stage: ShownStage): boolean {
   return stage === 'released' || stage === 'failed';
 }
