@@ -1,6 +1,6 @@
 # 36. Move the template and edity-sandbox to the shared workflows
 
-Status: ready-for-agent
+Status: resolved
 Repo: RMYPG/static-astro-site-template, RMYPG/edity-sandbox
 Milestone: After v1
 Blocked by: 35
@@ -11,10 +11,12 @@ Blocked by: 35
 
 ## Acceptance criteria
 
-- [ ] The template and `edity-sandbox` hold no CI or Release logic of their own, only callers
-- [ ] A Publish commit on `edity-sandbox` still produces a tag and an image with no step by the Developer
-- [ ] `edity-server`'s `check:progress` still reads the sandbox's Publishes as released
+- [x] The template and `edity-sandbox` hold no CI or Release logic of their own, only callers
+- [x] A Publish commit on `edity-sandbox` still produces a tag and an image with no step by the Developer
+- [x] `edity-server`'s `check:progress` still reads the sandbox's Publishes as released
 
 ## Comments
 
 2026-11-09: `edity-sandbox` moves in [RMYPG/edity-sandbox#5](https://github.com/RMYPG/edity-sandbox/pull/5). The template is still to do.
+
+2026-11-09: The template moved in [RMYPG/static-astro-site-template#19](https://github.com/RMYPG/static-astro-site-template/pull/19). `mise run check:sandbox` published twice on `edity-sandbox` and both were released as `v1.0.4` and `v1.0.5`, and `mise run check:progress` passes.
