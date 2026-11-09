@@ -1,6 +1,6 @@
 # 35. Release a given commit from the shared workflows
 
-Status: ready-for-agent
+Status: ready-for-human
 Repo: RMYPG/workflows
 Milestone: M6
 Blocked by: 27
@@ -29,3 +29,9 @@ Publish it as a new tag of `RMYPG/workflows`, without moving an existing one, an
 ## Notes
 
 The call to the webhook Receiver after the tag is part of [RMYPG/platform#143](https://github.com/RMYPG/platform/issues/143).
+
+## Comments
+
+2026-11-09: Merged in [RMYPG/workflows#8](https://github.com/RMYPG/workflows/pull/8) as `82754de`. `v1.3.0` is not published yet, and the README's examples pin it. Every criterion needs a real run, so none is ticked; offline tests cover the first three and the manual path. Whether `queue: max` works on a job called across repositories stays unknown until a real pair of Publishes.
+
+After tagging, `fisioindoor` and `vertex-glow` have to re-pin `release.yml` and delete its workflow-level `release` group, or pending dispatches keep cancelling each other. A Site must not add `release-on-publish.yml` before that, because the two would not share a queue.

@@ -1,6 +1,6 @@
 # 26. Publish from the Editor
 
-Status: ready-for-agent
+Status: ready-for-human
 Repo: RMYPG/edity
 Milestone: M5
 Blocked by: 14, 18, 22, 25
@@ -13,5 +13,9 @@ Wire Publish in the Editor: send the Draft, handle `202` (show progress, keep ne
 ## Acceptance criteria
 
 - [ ] A full Publish on `edity-sandbox` goes from click to Released with each stage shown
-- [ ] Publishing again during a Publish works (P8)
-- [ ] Each failure path has a message in `es` and `en`
+- [x] Publishing again during a Publish works (P8)
+- [x] Each failure path has a message in `es` and `en`
+
+## Comments
+
+2026-11-09: Merged in [RMYPG/edity#5](https://github.com/RMYPG/edity/pull/5) as `65ce68c`, with the API pinned to edity-server's `4dfff74`. Every path ran against a mocked API. What's left is the first criterion, which needs `edity-server` deployed ([RMYPG/platform#42](https://github.com/RMYPG/platform/issues/42)) and a real login. One local CI run hit a "Vite module runner has been closed" error in code this work doesn't touch; it hasn't been checked against `main`.
