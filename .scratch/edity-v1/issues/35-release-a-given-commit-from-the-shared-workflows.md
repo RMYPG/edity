@@ -1,6 +1,6 @@
 # 35. Release a given commit from the shared workflows
 
-Status: ready-for-human
+Status: resolved
 Repo: RMYPG/workflows
 Milestone: M6
 Blocked by: 27
@@ -20,10 +20,10 @@ Publish it as a new tag of `RMYPG/workflows`, without moving an existing one, an
 
 ## Acceptance criteria
 
-- [ ] A called run with `sha` releases that commit, even if `main` has moved on
-- [ ] A called run for a commit an existing tag already contains ends green with a notice
-- [ ] Two Publishes in quick succession are both released, with no pending run cancelled
-- [ ] A manual dispatch with no `sha` behaves as it does today, on `fisioindoor` and `vertex-glow`
+- [x] A called run with `sha` releases that commit, even if `main` has moved on
+- [x] A called run for a commit an existing tag already contains ends green with a notice
+- [x] Two Publishes in quick succession are both released, with no pending run cancelled
+- [x] A manual dispatch with no `sha` behaves as it does today, on `fisioindoor` and `vertex-glow`
 - [x] No published tag of `RMYPG/workflows` was moved
 
 ## Notes
@@ -37,3 +37,9 @@ The call to the webhook Receiver after the tag is part of [RMYPG/platform#143](h
 After tagging, `fisioindoor` and `vertex-glow` have to re-pin `release.yml` and delete its workflow-level `release` group, or pending dispatches keep cancelling each other. A Site must not add `release-on-publish.yml` before that, because the two would not share a queue.
 
 2026-11-09: `v1.3.0` is published on `82754de`, and the existing tags didn't move. `vertex-glow` re-pinned in [RMYPG/vertex-glow#44](https://github.com/RMYPG/vertex-glow/pull/44) and a real manual dispatch released `v0.1.3` ([run 42613518846](https://github.com/RMYPG/vertex-glow/actions/runs/42613518846)). The manual dispatch criterion still needs `fisioindoor`, which is pinned to `v1.0.0`. The other three criteria need real Publish commits on `edity-sandbox`, using the `dev` App.
+
+2026-11-09: Every criterion has now run for real, on `app-release.yml@v1.3.0`:
+- **A given commit, with `main` moved on:** two Publishes on `edity-sandbox` a few seconds apart. The first commit, `63c9984`, was tagged `v1.0.6` after `main` had moved to the second.
+- **Already released:** a re-run of the Release on Publish for `55fea96` ended green with "already released in v1.0.3", and the image and tag steps were skipped.
+- **Quick succession:** the same two Publishes were tagged `v1.0.6` and `v1.0.7` with no run cancelled, so `queue: max` works on a job called across repositories.
+- **Manual dispatch:** `vertex-glow` released `v0.1.3`, and `fisioindoor`, re-pinned in [RMYPG/fisioindoor#48](https://github.com/RMYPG/fisioindoor/pull/48), released `v1.0.3`.
