@@ -8,12 +8,12 @@ Covers: P4, P8, V8 (see the [spec](../spec.md))
 
 ## What to build
 
-Extend `GET /_edity/api/publish/:sha` past `released`, asking the platform's rollout status service about the Site's `production` environment (ADR-0003). It answers `target`, the newest version the platform has picked up; `running`, the version the Site serves; `phase`; and `reason`, when a rollout failed. Work out the stage on every request, with nothing stored:
+Extend `GET /_edity/api/publish/:sha` past `released`, asking the platform's rollout status service about the Site's `production` environment (ADR-0003). It answers `target`, the newest version the platform has picked up; `running`, the version the Site serves; `phase`; and `reason`, when something failed. `reason` can be set while `phase` is `live`, because a failing image scan leaves `target` behind without touching what runs. Work out the stage on every request, with nothing stored:
 
-- `released`: the tag exists, but `target` is older than this version.
+- `released`: the tag exists, `target` is older than this version, and `reason` is empty.
 - `deploying`: `target` is this version or newer, `running` is older, and `phase` is not `failed`.
 - `live`: `running` is this version or newer. Like `released` today, it wins over everything else.
-- `failed`: `phase` is `failed` while `target` is this version or newer and `running` is older, or `running` is still older 60 minutes after the tag. It opens or updates ticket 23's issue, with the service's `reason`.
+- `failed`: `phase` is `failed` while `target` is this version or newer and `running` is older; or `target` is older than this version and `reason` is set, because the platform can't see the new version; or `running` is still older 60 minutes after the tag. It opens or updates ticket 23's issue, with the service's `reason`.
 
 Also:
 
@@ -26,6 +26,7 @@ Also:
 
 - [ ] A second Publish that overtakes the first makes both report `live` once the newer version runs
 - [ ] A rollout that fails makes the Publish `failed` without waiting for the 60 minutes
+- [ ] A failing image scan makes a Publish newer than `target` `failed` without waiting for the 60 minutes
 - [ ] A Publish the Site isn't running 60 minutes after its tag turns `failed`, and a later rollout of it or a newer version still makes it `live`
 - [ ] A status service that can't be reached never makes a Publish `failed`
 - [ ] Each stage has a test against recorded responses from the status service
@@ -41,3 +42,5 @@ Needs [RMYPG/platform#142](https://github.com/RMYPG/platform/issues/142), which 
 ## Comments
 
 2026-11-09: Moved from reading GitHub Deployments to the platform's rollout status service, following RMYPG/platform#142 and the amended ADR-0003. The `edity-publisher` App needs no Deployments permission. With no stored record of a rollout, a Publish no longer stays `live` once production is rolled back below its version. Rollbacks are manual and rare.
+
+2026-11-09: A failing image scan stops `target` from moving, so comparing `running` and `target` can't show it. The service now reports it in `reason` while `phase` stays `live`, and a Publish newer than `target` fails on that `reason`.
