@@ -7,7 +7,7 @@ import {
   type Violation,
 } from '@edity/core';
 import type { PageMarker } from '../editable.js';
-import { isIndex, keysOf } from '../paths.js';
+import { isIndex, keysOf, pathOf } from '../paths.js';
 import type { Change, ContentValue } from './draft.js';
 import { fieldValue, type FieldDefinition } from './values.js';
 
@@ -66,6 +66,24 @@ export function valueAt(
     value = (value as Record<string, unknown>)[key];
   }
   return value as ContentValue;
+}
+
+/** Puts `value` at `path` in `content`, in place, if it has a value there. */
+export function setValueAt(
+  content: unknown,
+  path: string,
+  value: ContentValue,
+): void {
+  const keys = keysOf(path);
+  const last = keys.pop()!;
+  const parent = keys.length === 0 ? content : valueAt(content, pathOf(keys));
+  if (
+    typeof parent === 'object' &&
+    parent !== null &&
+    Object.hasOwn(parent, last)
+  ) {
+    (parent as Record<string, unknown>)[last] = value;
+  }
 }
 
 /**

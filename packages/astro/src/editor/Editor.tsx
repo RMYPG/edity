@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import { Counters } from './Counters.js';
 import { ListControls } from './ListControls.js';
 import { Preview, PreviewToggle } from './Preview.js';
+import { PublishNotices, PublishProgress } from './PublishProgress.js';
 import { asBuilt, showDraft } from './show-draft.js';
 import type { Editing, EditorState } from './state.js';
 
@@ -16,7 +17,7 @@ interface Props {
 
 /** The Editor's controls, rendered into its shadow root. */
 export function Editor({ editing }: Props) {
-  const { state, lists, limits } = editing;
+  const { state, lists, limits, publishing } = editing;
   // A view that appears after the first render came from the Client's
   // click, so it takes the focus the other view's button had.
   const started = useRef(false);
@@ -28,7 +29,10 @@ export function Editor({ editing }: Props) {
   const preview = useSignal(false);
 
   return (
-    <div class="edity" lang={state.locale}>
+    <div
+      class={publishing.progress.value ? 'edity following' : 'edity'}
+      lang={state.locale}
+    >
       {state.view.value === 'visitor' ? (
         <BackToEditing state={state} focus={focus} />
       ) : (
@@ -37,8 +41,16 @@ export function Editor({ editing }: Props) {
           <div class="spacer" />
           <ListControls state={state} lists={lists} />
           <Bar editing={editing} focus={focus} preview={preview} />
+          <PublishProgress editing={editing} />
           <Counters limits={limits} t={state.t} />
-          <NotApplied state={state} />
+          <div
+            class={
+              lists.controls.removed.value ? 'notices above-undo' : 'notices'
+            }
+          >
+            <PublishNotices editing={editing} />
+            <NotApplied state={state} />
+          </div>
           {preview.value && <Preview editing={editing} open={preview} />}
         </>
       )}
@@ -59,6 +71,7 @@ interface BarProps extends Props, ViewProps {
 function Bar({ editing, focus, preview }: BarProps) {
   const { session, page, t, draft, view, publishDisabled } = editing.state;
   const count = draft.count.value;
+  const sending = view.value === 'publishing';
   const visitorView = useFocusOnMount(focus);
 
   return (
@@ -75,7 +88,7 @@ function Bar({ editing, focus, preview }: BarProps) {
       <button
         type="button"
         class="discard"
-        disabled={count === 0}
+        disabled={count === 0 || sending}
         onClick={() => {
           const dropped = draft.discard();
           // The page as built, which a Change's `before` may not be (V2).
@@ -87,9 +100,13 @@ function Bar({ editing, focus, preview }: BarProps) {
       >
         {t.discard}
       </button>
-      {/* TODO(ticket 26): send the Draft, as `publishRequest` in api.ts. */}
-      <button type="button" class="publish" disabled={publishDisabled.value}>
-        {t.publish}
+      <button
+        type="button"
+        class="publish"
+        disabled={publishDisabled.value}
+        onClick={() => void editing.publishing.publish()}
+      >
+        {sending ? t.publishing.sending : t.publish}
       </button>
       <span class="tools">
         <PreviewToggle open={preview} t={t} />
@@ -97,6 +114,7 @@ function Bar({ editing, focus, preview }: BarProps) {
           ref={visitorView}
           type="button"
           class="tool"
+          disabled={sending}
           onClick={() => (view.value = 'visitor')}
         >
           <EyeIcon />

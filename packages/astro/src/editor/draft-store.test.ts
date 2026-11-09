@@ -1,6 +1,13 @@
 import { describe, expect, test } from 'vitest';
 import { Draft, type Change } from './draft.js';
-import { draftStore, keepDraft, type KeptStorage } from './draft-store.js';
+import {
+  draftStore,
+  keepDraft,
+  loginReturnStore,
+  progressStore,
+  publishedStore,
+  type KeptStorage,
+} from './draft-store.js';
 
 const title: Change = {
   path: 'hero.title',
@@ -171,5 +178,137 @@ describe('keepDraft', () => {
     stop();
     draft.record(price);
     expect(storage.items.size).toBe(0);
+  });
+});
+
+describe('publishedStore', () => {
+  test('keeps what a page has published, apart from its Draft', () => {
+    const storage = memory();
+    const draft = draftStore('fixture', 'home', () => storage);
+    const published = publishedStore('fixture', 'home', () => storage);
+    const change = { path: 'hero.title', before: 'A', after: 'B' };
+
+    published.keep([change]);
+
+    expect(published.load()).toEqual([change]);
+    expect(draft.load()).toEqual([]);
+  });
+
+  test('forgets it when nothing is left', () => {
+    const storage = memory();
+    const published = publishedStore('fixture', 'home', () => storage);
+
+    published.keep([{ path: 'hero.title', before: 'A', after: 'B' }]);
+    published.keep([]);
+
+    expect(storage.getItem('edity:published:v1:fixture:home')).toBeNull();
+  });
+
+  test('keeps the commit of the Publish each one went in, and drops one that is not a commit', () => {
+    const storage = memory();
+    const published = publishedStore('fixture', 'home', () => storage);
+    const change = {
+      path: 'hero.title',
+      before: 'A',
+      after: 'B',
+      sha: 'a'.repeat(40),
+    };
+    const unknown = { path: 'visit.price', before: 35, after: 40 };
+
+    published.keep([change, unknown]);
+    expect(published.load()).toEqual([change, unknown]);
+
+    storage.items.set(
+      'edity:published:v1:fixture:home',
+      JSON.stringify({ changes: [{ ...change, sha: 'x' }, unknown] }),
+    );
+    expect(published.load()).toEqual([unknown]);
+  });
+});
+
+describe('progressStore', () => {
+  const progress = {
+    sha: 'a'.repeat(40),
+    version: '1.4.3',
+    page: 'home',
+    stage: 'releasing',
+  } as const;
+
+  test("keeps the Site's followed Publish, for any page of it (P4)", () => {
+    const storage = memory();
+
+    progressStore('fixture', () => storage).keep(progress);
+
+    expect(progressStore('fixture', () => storage).load()).toEqual(progress);
+    expect(progressStore('other', () => storage).load()).toBeUndefined();
+  });
+
+  test('forgets it when there is none', () => {
+    const storage = memory();
+    const store = progressStore('fixture', () => storage);
+
+    store.keep(progress);
+    store.keep(undefined);
+
+    expect(store.load()).toBeUndefined();
+  });
+
+  test.each([
+    ['what is not JSON', '{'],
+    ['another shape', '{"sha":1}'],
+    [
+      'a sha that is not one',
+      '{"sha":"x","version":"1.0.0","page":"home","stage":"failed"}',
+    ],
+    [
+      'a stage the Editor does not show',
+      `{"sha":"${'a'.repeat(40)}","version":"1.0.0","page":"home","stage":"live"}`,
+    ],
+    [
+      'no page it published',
+      `{"sha":"${'a'.repeat(40)}","version":"1.0.0","stage":"failed"}`,
+    ],
+  ])('ignores %s', (_, kept) => {
+    const storage = memory();
+    storage.setItem('edity:publish:v1:fixture', kept);
+
+    expect(progressStore('fixture', () => storage).load()).toBeUndefined();
+  });
+
+  test('survives storage that throws', () => {
+    const store = progressStore('fixture', () => {
+      throw new Error('blocked');
+    });
+
+    expect(store.load()).toBeUndefined();
+    expect(() => store.keep(progress)).not.toThrow();
+  });
+});
+
+describe('loginReturnStore', () => {
+  test('tells once that the Client was sent to log in (A3)', () => {
+    const storage = memory();
+    loginReturnStore('fixture', () => storage).mark();
+
+    const store = loginReturnStore('fixture', () => storage);
+
+    expect(store.take()).toBe(true);
+    expect(store.take()).toBe(false);
+  });
+
+  test('is per Site', () => {
+    const storage = memory();
+    loginReturnStore('fixture', () => storage).mark();
+
+    expect(loginReturnStore('other', () => storage).take()).toBe(false);
+  });
+
+  test('survives storage that throws', () => {
+    const store = loginReturnStore('fixture', () => {
+      throw new Error('blocked');
+    });
+
+    expect(() => store.mark()).not.toThrow();
+    expect(store.take()).toBe(false);
   });
 });

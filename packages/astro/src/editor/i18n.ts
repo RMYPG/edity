@@ -2,6 +2,7 @@
 // follows the Client's, never the Site's.
 import type { Count } from './limits.js';
 import { listMessages, type ListMessages } from './lists-i18n.js';
+import { publishMessages, type PublishMessages } from './publish-i18n.js';
 
 /** A language the Editor speaks. */
 export type Locale = 'es' | 'en';
@@ -42,6 +43,8 @@ export interface Messages {
   readonly releaseFailed: string;
   /** The List controls' text. */
   readonly lists: ListMessages;
+  /** The text about a Publish and its progress. */
+  readonly publishing: PublishMessages;
 }
 
 const numbers = {
@@ -95,6 +98,7 @@ const messages: Readonly<Record<Locale, Messages>> = {
     releaseFailed:
       'Tus cambios están guardados, pero aún no se ven en la web: algo ha fallado por el camino. Ya se ha avisado a quien mantiene tu web.',
     lists: listMessages.es,
+    publishing: publishMessages.es,
   },
   en: {
     bar: 'Edity Editor',
@@ -141,6 +145,7 @@ const messages: Readonly<Record<Locale, Messages>> = {
     releaseFailed:
       'Your changes are saved, but they are not live yet: something went wrong on the way. Your developer has been notified.',
     lists: listMessages.en,
+    publishing: publishMessages.en,
   },
 };
 

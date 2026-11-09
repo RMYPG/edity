@@ -33,6 +33,8 @@
   --edity-focus: #93c5fd;
   --edity-shadow:
     0 8px 28px rgb(0 0 0 / 0.28), 0 0 0 1px rgb(255 255 255 / 0.06);
+  /* How far above the bottom of the window things above the bar can start. */
+  --edity-above-bar: 72px;
 
   color: var(--edity-text);
   font:
@@ -151,6 +153,53 @@ button:focus-visible {
   color: var(--edity-muted);
 }
 
+/* A Publish's progress (P4), just above the bar: one line, so the notices
+   above it know where to start. */
+.following {
+  --edity-above-bar: 108px;
+}
+
+.progress {
+  position: fixed;
+  z-index: 2147483647;
+  bottom: calc(66px + env(safe-area-inset-bottom));
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: calc(100% - 16px);
+  padding: 4px 8px 4px 12px;
+  border-radius: 10px;
+  background: var(--edity-surface);
+  box-shadow: var(--edity-shadow);
+  transform: translateX(-50%);
+}
+
+.progress button {
+  height: 28px;
+  padding: 0 10px;
+  font-size: 13px;
+  box-shadow: inset 0 0 0 1px var(--edity-line);
+}
+
+.steps {
+  display: flex;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  color: var(--edity-muted);
+  font-size: 13px;
+  line-height: 18px;
+  list-style: none;
+  white-space: nowrap;
+}
+
+.steps [aria-current='step'] {
+  color: var(--edity-text);
+  font-weight: 600;
+}
+
 /* The phone preview, at an iPhone's 390 x 844 px when the window holds it,
    above the bar on the right. Under the bar, which stays on top. */
 .preview {
@@ -175,28 +224,34 @@ button:focus-visible {
   background: #ffffff;
 }
 
-/* Above the bar, where the List controls' Undo also shows: the notice goes
-   once the Client changes the Draft, before any Item can be removed. */
-.notice {
+/* Above the bar, and above the List controls' Undo while it shows there. */
+.notices {
   position: fixed;
   z-index: 2147483647;
-  bottom: calc(72px + env(safe-area-inset-bottom));
+  bottom: calc(var(--edity-above-bar) + env(safe-area-inset-bottom));
   left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: max-content;
+  max-width: min(560px, calc(100% - 16px));
+  transform: translateX(-50%);
+}
+
+/* The Undo is 48 px tall, and the notices keep their gap to it. */
+.above-undo {
+  bottom: calc(var(--edity-above-bar) + 54px + env(safe-area-inset-bottom));
+}
+
+.notice {
   display: flex;
   align-items: center;
   gap: 8px;
-  max-width: calc(100% - 16px);
   padding: 6px 6px 6px 14px;
   border-radius: 10px;
   background: var(--edity-surface);
   box-shadow: var(--edity-shadow);
-  transform: translateX(-50%);
-}
-
-.notice span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .notice button {
@@ -217,6 +272,7 @@ button:focus-visible {
 @media (hover: hover) {
   .discard:not(:disabled):hover,
   .notice button:hover,
+  .progress button:hover,
   .tool:hover {
     background: var(--edity-surface-hover);
     color: var(--edity-text);
@@ -251,6 +307,11 @@ svg {
 @media (max-width: 560px) {
   .bar {
     gap: 4px;
+  }
+
+  /* Only the current step fits. */
+  .steps li:not([aria-current]) {
+    display: none;
   }
 
   button {

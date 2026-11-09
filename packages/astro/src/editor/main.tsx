@@ -6,11 +6,19 @@ import { markup } from '../markup.js';
 import { getSession } from './api.js';
 import { fitsDraft } from './content.js';
 import { editorRoot, readPage } from './documents.js';
-import { draftStore, keepDraft, type DraftStore } from './draft-store.js';
+import {
+  draftStore,
+  keepDraft,
+  loginReturnStore,
+  progressStore,
+  publishedStore,
+  type DraftStore,
+} from './draft-store.js';
 import { Editor } from './Editor.js';
 import { editFields } from './fields.js';
 import { editLists } from './lists.js';
 import { previewReady } from './Preview.js';
+import { startPublishing } from './publishing.js';
 import { restoreDraft } from './show-draft.js';
 import { createEditorState, type Editing } from './state.js';
 import { watchLimits } from './watch-limits.js';
@@ -53,11 +61,20 @@ async function start(): Promise<void> {
         changes,
       });
       const fields = editFields(state);
+      const lists = editLists(state, fields);
       const editing: Editing = {
         state,
         fields,
-        lists: editLists(state, fields),
+        lists,
         limits: watchLimits(state, fields),
+        publishing: startPublishing(
+          { state, fields, lists },
+          {
+            published: (name) => publishedStore(result.session.site, name),
+            progress: progressStore(result.session.site),
+            loginReturn: loginReturnStore(result.session.site),
+          },
+        ),
       };
       if (store !== undefined) {
         restore(editing, store, kept.length - changes.length);

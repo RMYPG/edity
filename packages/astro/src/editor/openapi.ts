@@ -14,8 +14,9 @@ export interface paths {
         /**
          * Log in
          * @description Starts logging in: redirects to Zitadel, with OIDC's authorization
-         *     code flow and PKCE (A1). The browser navigates here; the Editor does
-         *     not fetch it.
+         *     code flow and PKCE (A1), and asks the person to authenticate there
+         *     even if Zitadel already has a session for them. The browser navigates
+         *     here; the Editor does not fetch it.
          */
         readonly get: operations["login"];
         readonly put?: never;
@@ -114,6 +115,14 @@ export interface paths {
          *     patch bump of the Site's `package.json`, which a workflow in the
          *     Site repository then cuts as a Release (V3).
          *
+         *     A session can outlive the Client's role. So once the request is
+         *     validated, and before it counts against the Site's rate limit, the
+         *     server asks Zitadel whether the session's Client still holds the
+         *     Site's role (A1). It remembers no answer, though Zitadel's list
+         *     trails its writes, so a role removed only just now can still pass.
+         *     Only a Publish asks: `GET /_edity/api/session` answers from the
+         *     session alone.
+         *
          *     The Release ships everything on `main`. Once it has answered, the
          *     server reports on an issue of the Site repository the commits since
          *     the last Release that the edity-publisher GitHub App did not make and
@@ -166,7 +175,11 @@ export interface components {
         readonly Session: {
             /** @description The Client's name in Zitadel. */
             readonly name: string;
-            /** @description The Client's locale in Zitadel, such as `es` or `en-GB`, which the Editor's language follows (N6). */
+            /**
+             * @description The Client's locale in Zitadel, such as `es` or `en-GB`, which the
+             *     Editor's language follows (N6), or the Site's `locale` in the
+             *     Sites file when the Client has none.
+             */
             readonly locale: string;
             /** @description The Site's `id` in the server's Sites file, such as `edity-sandbox`. */
             readonly site: string;
@@ -332,8 +345,9 @@ export interface components {
             };
         };
         /**
-         * @description The request's `Origin` is not one of the Site's own, or it is a
-         *     `POST` without an `Origin` (A4).
+         * @description The request's `Origin` is not one of the Site's own, it is a `POST`
+         *     without an `Origin`, or it is a `GET` without an `Origin` whose
+         *     `Sec-Fetch-Site` says it comes from another origin (A4).
          */
         readonly ForeignOrigin: {
             headers: {
@@ -345,6 +359,15 @@ export interface components {
         };
         /** @description The hostname is not one of a configured Site's. */
         readonly UnknownSite: {
+            headers: {
+                readonly [name: string]: unknown;
+            };
+            content: {
+                readonly "text/plain": components["schemas"]["Message"];
+            };
+        };
+        /** @description Zitadel could not be reached, so the Client can't log in for now. No session. */
+        readonly ZitadelUnavailable: {
             headers: {
                 readonly [name: string]: unknown;
             };
@@ -368,8 +391,8 @@ export interface operations {
                  *     `/precios`, so the Client is back on the page whose Draft they were
                  *     editing (A3). Only a path on the Site's own origin counts: anything
                  *     that could lead elsewhere, such as `//other.example` or
-                 *     `https://other.example/`, counts as left out. The Site's home, `/`,
-                 *     when it is left out.
+                 *     `https://other.example/`, or is longer than 1024 bytes, counts as
+                 *     left out. The Site's home, `/`, when it is left out.
                  * @example /precios
                  */
                 readonly return?: string;
@@ -385,11 +408,18 @@ export interface operations {
                 headers: {
                     /** @description Zitadel's authorization endpoint, with the login's parameters. */
                     readonly Location: string;
+                    /**
+                     * @description The `edity_login` cookie that holds the login under way until
+                     *     Zitadel sends the browser back to `finishLogin`, for 10
+                     *     minutes. It is `HttpOnly` and scoped to the callback.
+                     */
+                    readonly "Set-Cookie": string;
                     readonly [name: string]: unknown;
                 };
                 content?: never;
             };
             readonly 404: components["responses"]["UnknownSite"];
+            readonly 503: components["responses"]["ZitadelUnavailable"];
         };
     };
     readonly finishLogin: {
@@ -417,8 +447,9 @@ export interface operations {
                     readonly Location: string;
                     /**
                      * @description The session cookie `edity_session`, `HttpOnly`, and the marker
-                     *     `edity=1`, both for 30 days (A2). The response has one
-                     *     `Set-Cookie` header for each.
+                     *     `edity=1`, both for 30 days (A2), and clears the login's
+                     *     `edity_login` cookie. The response has one `Set-Cookie` header
+                     *     for each.
                      */
                     readonly "Set-Cookie": string;
                     readonly [name: string]: unknown;
@@ -427,8 +458,9 @@ export interface operations {
             };
             /**
              * @description Not the end of a login this browser started: its `state` is
-             *     missing or not this browser's, it has no `code`, or Zitadel
-             *     answered an `error`. No session.
+             *     missing or not this browser's, the login took over 10 minutes,
+             *     it has no `code`, Zitadel answered an `error` or refused the
+             *     `code`, or what Zitadel answered does not check out. No session.
              */
             readonly 400: {
                 headers: {
@@ -438,7 +470,12 @@ export interface operations {
                     readonly "text/plain": components["schemas"]["Message"];
                 };
             };
-            /** @description The person who logged in does not have the Site's role, so is not one of its Clients. No session (A1). */
+            /**
+             * @description The person who logged in does not have the Site's role, so is not
+             *     one of its Clients, or Zitadel gives them no name, which every
+             *     Publish records. No session, and any session the browser had is
+             *     cleared (A1).
+             */
             readonly 403: {
                 headers: {
                     readonly [name: string]: unknown;
@@ -448,6 +485,7 @@ export interface operations {
                 };
             };
             readonly 404: components["responses"]["UnknownSite"];
+            readonly 503: components["responses"]["ZitadelUnavailable"];
         };
     };
     readonly logout: {
@@ -596,7 +634,26 @@ export interface operations {
                     readonly "text/plain": components["schemas"]["Message"];
                 };
             };
-            readonly 401: components["responses"]["NoSession"];
+            /**
+             * @description No session, or an expired one, or the session's Client no longer
+             *     holds the Site's role in Zitadel, which ends the session. Nothing
+             *     was committed. The Client logs in again (A3), where a login
+             *     without the role is refused.
+             */
+            readonly 401: {
+                headers: {
+                    /**
+                     * @description Sent only when the role is gone: clears the session cookie
+                     *     `edity_session` and the marker `edity`, with one `Set-Cookie`
+                     *     header for each.
+                     */
+                    readonly "Set-Cookie"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/plain": components["schemas"]["Message"];
+                };
+            };
             readonly 403: components["responses"]["ForeignOrigin"];
             readonly 404: components["responses"]["UnknownSite"];
             /**
@@ -698,10 +755,14 @@ export interface operations {
                 };
             };
             /**
-             * @description The Publish did not go through for now: GitHub could not be
-             *     reached or is limiting the server's requests, or `main` kept
-             *     moving while the server committed. The Client can publish again
-             *     later.
+             * @description The Publish did not go through for now: Zitadel could not say
+             *     whether the Client still holds the Site's role, GitHub could not
+             *     be reached or is limiting the server's requests, or `main` kept
+             *     moving while the server committed. The session stays, and the
+             *     Client can publish again later. Nothing was committed, with one
+             *     exception: when GitHub did not tell whether it made the commit,
+             *     the commit may be on `main`. Publishing the same Draft again
+             *     then commits nothing more, and answers with that Publish.
              */
             readonly 503: {
                 headers: {

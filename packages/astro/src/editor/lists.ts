@@ -16,8 +16,9 @@ import type { ListDefinition } from '@edity/core';
 import { batch, computed, signal, type ReadonlySignal } from '@preact/signals';
 import type { PageMarker } from '../editable.js';
 import { markedPath, markup, selector } from '../markup.js';
-import { childPath, itemPathOf, listPathOf } from '../paths.js';
+import { childPath, isWithin, itemPathOf, listPathOf } from '../paths.js';
 import { valueAt } from './content.js';
+import { readPage } from './documents.js';
 import type { Change, ContentValue } from './draft.js';
 import { sameRow } from './drop.js';
 import { whileEditing, type On } from './edit-view.js';
@@ -70,6 +71,12 @@ export interface Lists {
     root?: ParentNode,
     change?: Pick<Change, 'before' | 'origins'>,
   ): void;
+  /**
+   * After a Publish of the Changes at `paths`: the Lists at them and inside
+   * them are as built again, as the page shows them now, so the page's
+   * content must hold their values already.
+   */
+  settle(paths: readonly string[]): void;
   /** What the List controls show, and what they do. */
   readonly controls: ListsUi;
 }
@@ -170,6 +177,7 @@ export function editLists(state: EditorState, fields: Fields): Lists {
     const nothing = signal(undefined);
     return {
       show() {},
+      settle() {},
       controls: {
         layout: signal(0),
         dragged: nothing,
@@ -245,17 +253,24 @@ function editPage(
   function registerAll(root: Document): void {
     if (known.has(root)) return;
     known.add(root);
+    // Another document, such as the phone preview's, was built without what
+    // has been published since this page's content was.
+    const content = root === document ? page.content : readPage(root)?.content;
     for (const list of root.querySelectorAll<HTMLElement>(listSelector)) {
-      register(list, true);
+      register(list, true, content);
     }
   }
 
-  /** The Editor's own model of `list` and its Items. */
-  function register(list: HTMLElement, built: boolean): void {
+  /** The Editor's own model of `list` and its Items, built from `from`. */
+  function register(
+    list: HTMLElement,
+    built: boolean,
+    from: unknown = page.content,
+  ): void {
     const definition = listDefinition(list);
     if (definition === undefined) return;
     const path = markedPath(list, markup.list);
-    const content = valueAt(page.content, path);
+    const content = valueAt(from, path);
     const values = built && Array.isArray(content) ? content : [];
     const elements = itemsOf(list);
     lists.set(list, {
@@ -704,6 +719,8 @@ function editPage(
   function shown(): Shown {
     // The controls measure the page each time it may have changed.
     void layout.value;
+    // While the Draft is on its way, nothing on the page can change.
+    if (view.value !== 'edit') return { lists: [], item: undefined };
     const current = active.value?.isConnected ? active.value : undefined;
     // The active Item's outer List and the Lists in it, and every empty
     // List, which has no Item to make active.
@@ -806,6 +823,9 @@ function editPage(
 
     return () => {
       drags.cancel();
+      // The Undo goes with the controls: an Item whose removal is being
+      // published cannot be put back.
+      undos.dismiss();
       removeSheet();
       hovered.value = undefined;
       touch(undefined);
@@ -827,6 +847,13 @@ function editPage(
       }
       undos.dismiss();
       quietly(() => showList(list, value, change));
+      relayout();
+    },
+    settle(paths) {
+      for (const list of document.querySelectorAll<HTMLElement>(listSelector)) {
+        const path = markedPath(list, markup.list);
+        if (paths.some((each) => isWithin(path, each))) register(list, true);
+      }
       relayout();
     },
     controls: {

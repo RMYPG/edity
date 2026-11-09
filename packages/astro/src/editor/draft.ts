@@ -22,7 +22,9 @@ export interface Change {
   readonly path: string;
   /**
    * The value the Client changed: the one in the content the page was built
-   * from when they first made the Change. The Draft keeps it while the
+   * from, or published over it, when they first made the Change, so a Change
+   * made during a Publish starts from what it published (P8). The Draft keeps
+   * it while the
    * Change is recorded again, also after a reload, so the server can tell
    * when a newer Release changed it too: a Conflict (V2).
    */

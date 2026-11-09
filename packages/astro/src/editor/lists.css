@@ -103,7 +103,7 @@
 .undo {
   position: fixed;
   z-index: 2147483647;
-  bottom: calc(72px + env(safe-area-inset-bottom));
+  bottom: calc(var(--edity-above-bar) + env(safe-area-inset-bottom));
   left: 50%;
   display: flex;
   align-items: center;

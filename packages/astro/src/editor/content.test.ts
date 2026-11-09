@@ -8,6 +8,7 @@ import {
 } from '@edity/core';
 import { describe, expect, test } from 'vitest';
 import {
+  setValueAt,
   definitionAt,
   fieldAt,
   fieldChange,
@@ -284,5 +285,33 @@ describe('isWellFormed', () => {
         after: ['Una', 'Dos'],
       }),
     ).toBe(true);
+  });
+});
+
+describe('setValueAt', () => {
+  test('puts a value at a path, in place', () => {
+    const content = { hero: { title: 'A' }, plans: [{ price: 1 }] };
+
+    setValueAt(content, 'hero.title', 'B');
+    setValueAt(content, 'plans.0.price', 2);
+
+    expect(content).toEqual({ hero: { title: 'B' }, plans: [{ price: 2 }] });
+  });
+
+  test('replaces a whole List', () => {
+    const content = { services: ['A'] };
+
+    setValueAt(content, 'services', ['A', 'B']);
+
+    expect(content).toEqual({ services: ['A', 'B'] });
+  });
+
+  test('leaves the content alone where it has no value at the path', () => {
+    const content = { hero: { title: 'A' } };
+
+    setValueAt(content, 'hero.lead', 'B');
+    setValueAt(content, 'footer.note', 'B');
+
+    expect(content).toEqual({ hero: { title: 'A' } });
   });
 });

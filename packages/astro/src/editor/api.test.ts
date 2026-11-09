@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import { parse } from 'yaml';
 import openapi from '../../api/openapi.yaml?raw';
 import { isWithin } from '../paths.js';
-import { publishRequest } from './api.js';
+import { loginUrl, publishRequest } from './api.js';
 import { Draft, type Change } from './draft.js';
 
 /**
@@ -31,6 +31,15 @@ function schemaAt(pointer: string) {
   if (validate === undefined) throw new Error(`No schema at ${pointer}`);
   return validate;
 }
+
+describe('loginUrl (A3)', () => {
+  test('asks the server to come back to the path, escaped', () => {
+    expect(loginUrl('/')).toBe('/_edity/login?return=%2F');
+    expect(loginUrl('/precios/año')).toBe(
+      '/_edity/login?return=%2Fprecios%2Fa%C3%B1o',
+    );
+  });
+});
 
 describe("Publish's request against the OpenAPI file", () => {
   const validRequest = schemaAt(

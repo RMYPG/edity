@@ -12,6 +12,7 @@ import { Counters } from './Counters.js';
 import { editorRoot, readPage } from './documents.js';
 import type { Change } from './draft.js';
 import type { Messages } from './i18n.js';
+import { stillToBuild } from './published.js';
 import { adoptSheet } from './sheets.js';
 import { draftDelta, showDraft } from './show-draft.js';
 import type { Editing } from './state.js';
@@ -119,7 +120,7 @@ function showIn(frame: HTMLIFrameElement, editing: Editing): () => void {
  * that stops.
  */
 function showPage(document: Document, editing: Editing): () => void {
-  const { state, limits } = editing;
+  const { state, limits, publishing } = editing;
   const { draft, page, locale, t } = state;
   // A desktop's scroll bar would take some 15 px of the 390, and a phone's
   // takes none.
@@ -129,10 +130,16 @@ function showPage(document: Document, editing: Editing): () => void {
   );
   // A link in the frame can lead to another page, which shows as published:
   // the Draft is this page's.
-  if (page === undefined || readPage(document)?.page !== page.page) {
-    return () => {};
-  }
+  const built = readPage(document);
+  if (page === undefined || built?.page !== page.page) return () => {};
 
+  // What was published and the frame's page was not built with, before the
+  // Draft goes on top of it.
+  showDraft(
+    editing,
+    stillToBuild(built.content, publishing.published()),
+    document,
+  );
   let showing: ReadonlyMap<string, Change> = new Map();
   const stopShowing = effect(() => {
     const changes = draft.changes.value;
