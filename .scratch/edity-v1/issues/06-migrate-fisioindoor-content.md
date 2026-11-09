@@ -1,6 +1,6 @@
 # 06. Move fisioindoor content to JSON and Field definitions
 
-Status: ready-for-human
+Status: resolved
 Repo: RMYPG/fisioindoor
 Milestone: M0
 Blocked by: 03
@@ -23,3 +23,5 @@ Merge only when you are ready to release it; no Edity code runs on the page yet.
 ## Comments
 
 2026-11-09: Built in draft [RMYPG/fisioindoor#43](https://github.com/RMYPG/fisioindoor/pull/43), with CI green. All 11 before-and-after screenshots are byte-identical. It stays open until you want to release it.
+
+2026-11-09: Merged in [RMYPG/fisioindoor#43](https://github.com/RMYPG/fisioindoor/pull/43) as `8a3ae83` and released as `v1.0.2`, which is live on `fisioindoor.com`. The visible text is identical to the previous build.
