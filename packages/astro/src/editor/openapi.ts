@@ -115,6 +115,14 @@ export interface paths {
          *     patch bump of the Site's `package.json`, which a workflow in the
          *     Site repository then cuts as a Release (V3).
          *
+         *     A session can outlive the Client's role. So once the request is
+         *     validated, and before it counts against the Site's rate limit, the
+         *     server asks Zitadel whether the session's Client still holds the
+         *     Site's role (A1). It remembers no answer, though Zitadel's list
+         *     trails its writes, so a role removed only just now can still pass.
+         *     Only a Publish asks: `GET /_edity/api/session` answers from the
+         *     session alone.
+         *
          *     The Release ships everything on `main`. Once it has answered, the
          *     server reports on an issue of the Site repository the commits since
          *     the last Release that the edity-publisher GitHub App did not make and
@@ -626,7 +634,26 @@ export interface operations {
                     readonly "text/plain": components["schemas"]["Message"];
                 };
             };
-            readonly 401: components["responses"]["NoSession"];
+            /**
+             * @description No session, or an expired one, or the session's Client no longer
+             *     holds the Site's role in Zitadel, which ends the session. Nothing
+             *     was committed. The Client logs in again (A3), where a login
+             *     without the role is refused.
+             */
+            readonly 401: {
+                headers: {
+                    /**
+                     * @description Sent only when the role is gone: clears the session cookie
+                     *     `edity_session` and the marker `edity`, with one `Set-Cookie`
+                     *     header for each.
+                     */
+                    readonly "Set-Cookie"?: string;
+                    readonly [name: string]: unknown;
+                };
+                content: {
+                    readonly "text/plain": components["schemas"]["Message"];
+                };
+            };
             readonly 403: components["responses"]["ForeignOrigin"];
             readonly 404: components["responses"]["UnknownSite"];
             /**
@@ -728,10 +755,14 @@ export interface operations {
                 };
             };
             /**
-             * @description The Publish did not go through for now: GitHub could not be
-             *     reached or is limiting the server's requests, or `main` kept
-             *     moving while the server committed. The Client can publish again
-             *     later.
+             * @description The Publish did not go through for now: Zitadel could not say
+             *     whether the Client still holds the Site's role, GitHub could not
+             *     be reached or is limiting the server's requests, or `main` kept
+             *     moving while the server committed. The session stays, and the
+             *     Client can publish again later. Nothing was committed, with one
+             *     exception: when GitHub did not tell whether it made the commit,
+             *     the commit may be on `main`. Publishing the same Draft again
+             *     then commits nothing more, and answers with that Publish.
              */
             readonly 503: {
                 headers: {
