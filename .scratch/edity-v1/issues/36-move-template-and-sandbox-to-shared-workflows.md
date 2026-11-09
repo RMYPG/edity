@@ -14,3 +14,7 @@ Blocked by: 35
 - [ ] The template and `edity-sandbox` hold no CI or Release logic of their own, only callers
 - [ ] A Publish commit on `edity-sandbox` still produces a tag and an image with no step by the Developer
 - [ ] `edity-server`'s `check:progress` still reads the sandbox's Publishes as released
+
+## Comments
+
+2026-11-09: `edity-sandbox` moves in [RMYPG/edity-sandbox#5](https://github.com/RMYPG/edity-sandbox/pull/5). The template is still to do.

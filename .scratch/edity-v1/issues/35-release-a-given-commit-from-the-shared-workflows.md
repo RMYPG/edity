@@ -24,7 +24,7 @@ Publish it as a new tag of `RMYPG/workflows`, without moving an existing one, an
 - [ ] A called run for a commit an existing tag already contains ends green with a notice
 - [ ] Two Publishes in quick succession are both released, with no pending run cancelled
 - [ ] A manual dispatch with no `sha` behaves as it does today, on `fisioindoor` and `vertex-glow`
-- [ ] No published tag of `RMYPG/workflows` was moved
+- [x] No published tag of `RMYPG/workflows` was moved
 
 ## Notes
 
@@ -35,3 +35,5 @@ The call to the webhook Receiver after the tag is part of [RMYPG/platform#143](h
 2026-11-09: Merged in [RMYPG/workflows#8](https://github.com/RMYPG/workflows/pull/8) as `82754de`. `v1.3.0` is not published yet, and the README's examples pin it. Every criterion needs a real run, so none is ticked; offline tests cover the first three and the manual path. Whether `queue: max` works on a job called across repositories stays unknown until a real pair of Publishes.
 
 After tagging, `fisioindoor` and `vertex-glow` have to re-pin `release.yml` and delete its workflow-level `release` group, or pending dispatches keep cancelling each other. A Site must not add `release-on-publish.yml` before that, because the two would not share a queue.
+
+2026-11-09: `v1.3.0` is published on `82754de`, and the existing tags didn't move. `vertex-glow` re-pinned in [RMYPG/vertex-glow#44](https://github.com/RMYPG/vertex-glow/pull/44) and a real manual dispatch released `v0.1.3` ([run 42613518846](https://github.com/RMYPG/vertex-glow/actions/runs/42613518846)). The manual dispatch criterion still needs `fisioindoor`, which is pinned to `v1.0.0`. The other three criteria need real Publish commits on `edity-sandbox`, using the `dev` App.
