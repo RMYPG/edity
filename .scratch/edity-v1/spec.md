@@ -136,6 +136,7 @@ Must means version one is not usable without it. Should means it belongs in vers
 | A2 | The session lasts 30 days in an HttpOnly cookie scoped to `/_edity/api`, and can be ended with a logout control | Must |
 | A3 | An expired session at Publish sends the Client to log in again. The Draft is restored on return, and the Client presses Publish again | Must |
 | A4 | The Editor loads only in browsers carrying the `edity=1` marker cookie and removes itself if the server rejects the session; the server authorises every API call and checks its `Origin` | Must |
+| A5 | Every Publish asks Zitadel whether the Client still holds the Site's role. If they don't, the session ends and the Publish is refused; if Zitadel can't answer, the Publish fails and nothing is committed | Must |
 
 Failed-login throttling is handled by Zitadel.
 
