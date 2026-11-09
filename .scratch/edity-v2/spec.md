@@ -37,8 +37,8 @@ These join or replace entries in [`CONTEXT.md`](../../CONTEXT.md) when version t
 
 | ID | Requirement |
 | --- | --- |
-| H1 | The Hub runs on its own hostname with Zitadel login, is served by `edity-server`, and reads only GitHub |
-| H2 | The Hub lists a Client's Sites, each Site's open Proposals and their Previews, each Proposal's Conflicts with a link to resolve them in the Editor, Merge, the Next Release Preview, Publish, and deployment history from GitHub Deployments |
+| H1 | The Hub runs on its own hostname with Zitadel login, is served by `edity-server`, and reads only GitHub and the platform's rollout status service |
+| H2 | The Hub lists a Client's Sites, each Site's open Proposals and their Previews, each Proposal's Conflicts with a link to resolve them in the Editor, Merge, the Next Release Preview, Publish, and recent deployment history from the platform's rollout status service |
 | H3 | An Edit link opens the Site with the Editor on a chosen Proposal |
 | H4 | The Editor stays on the Site's own origin and keeps editing and Limits. It overlays the Proposal's values on the live page |
 | H5 | A Field that exists only in unpublished commits can't be edited on the live page; the Editor says so and links to the Preview |
@@ -77,7 +77,7 @@ These join or replace entries in [`CONTEXT.md`](../../CONTEXT.md) when version t
 
 ## Platform dependencies
 
-- [RMYPG/platform#142](https://github.com/RMYPG/platform/issues/142) must also report `staging` and previews, including the commit each one runs. The Hub and B2 rely on that.
+- [RMYPG/platform#142](https://github.com/RMYPG/platform/issues/142) must also report `staging` and previews, including the commit each one runs. The Hub and B2 rely on that. Its history covers only the rollouts the platform still retains; a lasting record would need its own store.
 - Previews, including the Next Release Preview, need public hostnames behind the Zitadel login through Cloudflare Access. Today they are reachable only over Tailscale, and preview namespaces admit traffic only from its proxies. No issue is open yet; open one when this version is scheduled.
 - [RMYPG/platform#143](https://github.com/RMYPG/platform/issues/143) would shorten the wait for staging as well as production.
 
