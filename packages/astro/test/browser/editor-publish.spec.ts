@@ -35,13 +35,20 @@ async function nextPoll(page: Page): Promise<void> {
 }
 
 /**
+ * Waits a second in real time, for a request the page has sent to reach
+ * page.route(): only then does `asked` show that nothing was asked.
+ */
+async function letRequestsArrive(page: Page): Promise<void> {
+  await page.waitForTimeout(1_000);
+}
+
+/**
  * Moves the page's clock past the Editor's next poll, to check that nothing
- * more is asked. A request the page sends reaches page.route() a moment
- * later, in real time, so this waits a second for one.
+ * more is asked.
  */
 async function pastNextPoll(page: Page): Promise<void> {
   await page.clock.fastForward(pollEvery + 1_000);
-  await page.waitForTimeout(1_000);
+  await letRequestsArrive(page);
 }
 
 /**
@@ -63,6 +70,15 @@ async function askedUntil(
       return api.asked.get(sha) ?? 0;
     })
     .toBe(count);
+}
+
+/**
+ * Stops the page's clock, so that it moves only when the test moves it: a
+ * poll set from then on comes exactly when the Editor set it to.
+ */
+async function stopClock(page: Page): Promise<void> {
+  // A second ahead: the page's clock goes on while its time is read.
+  await page.clock.pauseAt(await page.evaluate(() => Date.now() + 1_000));
 }
 
 /**
@@ -932,11 +948,16 @@ test('a failed Publish that a newer Release covers shows it without a reload (P8
   api.status[sha] = stageOf('failed');
   await openEditor();
   await type(page, 'hero.title', 'Otro título');
+  await stopClock(page);
   await publishButton(bar).click();
   await expect(progress(editor)).toBeVisible();
   const current = progress(editor).locator('[aria-current="step"]');
 
-  await page.clock.fastForward(5_000);
+  // One under way is asked 5 seconds after the server took it, not sooner.
+  await page.clock.fastForward(pollEvery - 1);
+  await letRequestsArrive(page);
+  expect(api.asked.get(sha) ?? 0).toBe(0);
+  await page.clock.fastForward(1);
   await expect(current).toHaveText('Ha fallado');
   await expect(editor.getByRole('alert')).toBeVisible();
 
@@ -944,7 +965,7 @@ test('a failed Publish that a newer Release covers shows it without a reload (P8
   api.status[sha] = stageOf('released');
   const asked = api.asked.get(sha);
   await page.clock.fastForward(20_000);
-  await page.waitForTimeout(1_000);
+  await letRequestsArrive(page);
   expect(api.asked.get(sha)).toBe(asked);
 
   await page.clock.fastForward(10_000);
