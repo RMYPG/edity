@@ -44,6 +44,13 @@ async function pastNextPoll(page: Page): Promise<void> {
   await page.waitForTimeout(1_000);
 }
 
+/**
+ * Why a test runs in Chromium only: all it checks is how the Editor follows a
+ * Publish's progress, its own logic, the same in any browser. The tests of how
+ * the bar shows the progress run in every browser.
+ */
+const followingOnly = 'following a Publish is the same in any browser';
+
 /** Types `text` over the Field at `path`, and leaves the Field. */
 async function type(page: Page, path: string, text: string): Promise<void> {
   await editAll(page, path);
@@ -862,7 +869,9 @@ test('a Publish that fails and is then covered by a newer Release shows it after
   openEditor,
   bar,
   editor,
+  browserName,
 }) => {
+  test.skip(browserName !== 'chromium', followingOnly);
   await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
@@ -888,7 +897,9 @@ test('a failed Publish that a newer Release covers shows it without a reload (P8
   openEditor,
   bar,
   editor,
+  browserName,
 }) => {
+  test.skip(browserName !== 'chromium', followingOnly);
   await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
@@ -951,7 +962,9 @@ for (const stage of ['deploying', 'live']) {
     openEditor,
     bar,
     editor,
+    browserName,
   }) => {
+    test.skip(browserName !== 'chromium', followingOnly);
     await page.clock.install();
     const api = await mockPublishApi(page);
     api.publish = { status: 202, json: { sha, version: '1.4.3' } };
@@ -974,7 +987,9 @@ test('when the progress cannot be read, the bar keeps its stage and says so, and
   openEditor,
   bar,
   editor,
+  browserName,
 }) => {
+  test.skip(browserName !== 'chromium', followingOnly);
   await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
@@ -1006,7 +1021,9 @@ test('a session that ends while the progress is followed says so, and stops aski
   openEditor,
   bar,
   editor,
+  browserName,
 }) => {
+  test.skip(browserName !== 'chromium', followingOnly);
   await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
@@ -1072,7 +1089,9 @@ for (const [locale, message, button] of [
     openEditor,
     bar,
     editor,
+    browserName,
   }) => {
+    test.skip(browserName !== 'chromium', followingOnly);
     await page.clock.install();
     const api = await mockPublishApi(page);
     api.publish = { status: 202, json: { sha, version: '1.4.3' } };
