@@ -279,8 +279,13 @@ test('Publishing again during a Publish sends what the first one published as th
   await expect(field(page, 'hero.title')).toHaveText('Tercer título');
   await expect(bar.getByRole('status')).toHaveText('Sin cambios');
 
-  // The older one is no longer followed: the newer Release contains it.
+  // The older one is no longer followed: the newer Release contains it. Once
+  // the bar shows the newer one's next stage, its next poll is set.
+  api.status[newer] = stageOf('releasing', '1.4.4');
   await nextPoll(page);
+  await expect(progress(editor).locator('[aria-current="step"]')).toHaveText(
+    'Creando la versión',
+  );
   await expect.poll(() => api.asked.get(newer)).toBeGreaterThan(0);
   const asked = api.asked.get(sha);
   await pastNextPoll(page);
