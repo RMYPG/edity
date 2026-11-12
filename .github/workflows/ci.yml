@@ -15,7 +15,10 @@ concurrency:
 
 jobs:
   check:
-    runs-on: blacksmith-2vcpu-ubuntu-2404
+    # GitHub's hosted runner has 4 vCPUs for public repositories, free, so
+    # Playwright runs 2 workers. On a 2-vCPU runner it runs 1, and the browser
+    # tests alone took over 12 of the 15 minutes.
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
