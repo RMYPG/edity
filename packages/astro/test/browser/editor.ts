@@ -88,8 +88,15 @@ export interface MockPublishApi {
    * cuts the connection.
    */
   publish: MockAnswer | 'abort' | ((body: unknown) => MockAnswer | 'abort');
-  /** What each commit's progress answers: `'abort'` cuts the connection. */
-  status: Record<string, MockAnswer | 'abort'>;
+  /**
+   * What each commit's progress answers: `'abort'` cuts the connection. A
+   * function can hold the answer back: the call is counted in `asked` as it
+   * comes, and answered once the function's promise settles.
+   */
+  status: Record<
+    string,
+    MockAnswer | 'abort' | (() => Promise<MockAnswer | 'abort'>)
+  >;
 }
 
 /** Answers the page's Publish and status calls as `MockPublishApi` says. */
@@ -120,10 +127,14 @@ export async function mockPublishApi(page: Page): Promise<MockPublishApi> {
       typeof api.publish === 'function' ? api.publish(body) : api.publish,
     );
   });
-  await page.route('**/_edity/api/publish/*', (route) => {
+  await page.route('**/_edity/api/publish/*', async (route) => {
     const sha = new URL(route.request().url()).pathname.split('/').at(-1)!;
     api.asked.set(sha, (api.asked.get(sha) ?? 0) + 1);
-    return fulfil(route, api.status[sha] ?? { status: 404 });
+    const answer = api.status[sha] ?? { status: 404 };
+    return fulfil(
+      route,
+      typeof answer === 'function' ? await answer() : answer,
+    );
   });
   return api;
 }

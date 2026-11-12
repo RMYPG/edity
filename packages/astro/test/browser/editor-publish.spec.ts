@@ -45,6 +45,27 @@ async function pastNextPoll(page: Page): Promise<void> {
 }
 
 /**
+ * Moves the page's clock on a poll at a time until the Editor has asked for
+ * `sha`'s progress `count` times, for answers the bar shows nothing of. It
+ * moves the clock only while fewer have been asked, so it never sets off a
+ * poll more. A move made before the last answer has set the next poll sets
+ * off nothing, and the next move does.
+ */
+async function askedUntil(
+  page: Page,
+  api: MockPublishApi,
+  sha: string,
+  count: number,
+): Promise<void> {
+  await expect
+    .poll(async () => {
+      if ((api.asked.get(sha) ?? 0) < count) await nextPoll(page);
+      return api.asked.get(sha) ?? 0;
+    })
+    .toBe(count);
+}
+
+/**
  * Why a test runs in Chromium only: all it checks is how the Editor follows a
  * Publish's progress, its own logic, the same in any browser. The tests of how
  * the bar shows the progress run in every browser.
@@ -993,7 +1014,14 @@ test('when the progress cannot be read, the bar keeps its stage and says so, and
   await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
-  api.status[sha] = { status: 503, headers: { 'Retry-After': '1' } };
+  const unavailable = { status: 503, headers: { 'Retry-After': '1' } };
+  // The second answer waits, so the bar can be seen between the two.
+  let answerSecond: () => void = () => {};
+  const second = new Promise<void>((resolve) => (answerSecond = resolve));
+  api.status[sha] = async () => {
+    if (api.asked.get(sha) === 2) await second;
+    return unavailable;
+  };
   await openEditor();
   await type(page, 'hero.title', 'Otro título');
 
@@ -1003,11 +1031,12 @@ test('when the progress cannot be read, the bar keeps its stage and says so, and
   await expect(current).toHaveText('Validando');
   const unknown = editor.getByText(progressUnknown);
   // Only once it has failed twice: a moment's 503 is not worth a word. The
-  // bar shows nothing of the first, so the clock goes on a poll at a time.
-  await expect(async () => {
-    await nextPoll(page);
-    await expect(unknown).toBeVisible({ timeout: 500 });
-  }).toPass();
+  // second poll comes once the first 503 is handled.
+  await askedUntil(page, api, sha, 2);
+  await expect(unknown).toHaveCount(0);
+  answerSecond();
+  await expect(unknown).toBeVisible();
+  expect(api.asked.get(sha)).toBe(2);
 
   api.status[sha] = stageOf('releasing');
 
