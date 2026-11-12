@@ -54,22 +54,41 @@ async function pastNextPoll(page: Page): Promise<void> {
 /**
  * Moves the page's clock on a poll at a time until the Editor has asked for
  * `sha`'s progress `count` times, for answers the bar shows nothing of. It
- * moves the clock only while fewer have been asked, so it never sets off a
- * poll more. A move made before the last answer has set the next poll sets
- * off nothing, and the next move does.
+ * fails if the clock would have to move more than `within` ms for that.
+ *
+ * It moves the clock only once every poll asked has been answered, as the
+ * Editor sets the next poll only then, and only while fewer than `count`
+ * have been asked, so it never sets off one more. A move made before the
+ * page has handled the answer sets off nothing, and costs a move of
+ * `within`.
  */
 async function askedUntil(
   page: Page,
   api: MockPublishApi,
   sha: string,
   count: number,
+  within: number,
 ): Promise<void> {
-  await expect
-    .poll(async () => {
-      if ((api.asked.get(sha) ?? 0) < count) await nextPoll(page);
-      return api.asked.get(sha) ?? 0;
-    })
-    .toBe(count);
+  const asked = () => api.asked.get(sha) ?? 0;
+  for (let moved = 0; asked() < count; moved += pollEvery) {
+    await expect
+      .poll(() => api.answered.get(sha) ?? 0, {
+        message: `the answer to poll ${asked()}`,
+      })
+      .toBe(asked());
+    if (moved + pollEvery > within) {
+      throw new Error(
+        `Poll ${asked() + 1} had not been asked ${within / 1000} seconds on.`,
+      );
+    }
+    const before = asked();
+    await nextPoll(page);
+    // The poll a move sets off reaches page.route() a moment later.
+    await expect
+      .poll(asked, { timeout: 500 })
+      .toBeGreaterThan(before)
+      .catch(() => {});
+  }
 }
 
 /**
@@ -1056,9 +1075,9 @@ test('when the progress cannot be read, the bar keeps its stage and says so, and
   const current = progress(editor).locator('[aria-current="step"]');
   await expect(current).toHaveText('Validando');
   const unknown = editor.getByText(progressUnknown);
-  // Only once it has failed twice: a moment's 503 is not worth a word. The
-  // second poll comes once the first 503 is handled.
-  await askedUntil(page, api, sha, 2);
+  // Only once it has failed twice, within 20 seconds: a moment's 503 is not
+  // worth a word. The second poll comes once the first 503 is handled.
+  await askedUntil(page, api, sha, 2, 20_000);
   await expect(unknown).toHaveCount(0);
   answerSecond();
   await expect(unknown).toBeVisible();

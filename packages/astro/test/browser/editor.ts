@@ -83,6 +83,8 @@ export interface MockPublishApi {
   readonly published: unknown[];
   /** How many times the Editor asked for each commit's progress. */
   readonly asked: Map<string, number>;
+  /** How many of those asks have been answered, for each commit. */
+  readonly answered: Map<string, number>;
   /**
    * What the next Publish answers. A function can see the body; `'abort'`
    * cuts the connection.
@@ -104,6 +106,7 @@ export async function mockPublishApi(page: Page): Promise<MockPublishApi> {
   const api: MockPublishApi = {
     published: [],
     asked: new Map(),
+    answered: new Map(),
     publish: { status: 500 },
     status: {},
   };
@@ -131,10 +134,8 @@ export async function mockPublishApi(page: Page): Promise<MockPublishApi> {
     const sha = new URL(route.request().url()).pathname.split('/').at(-1)!;
     api.asked.set(sha, (api.asked.get(sha) ?? 0) + 1);
     const answer = api.status[sha] ?? { status: 404 };
-    return fulfil(
-      route,
-      typeof answer === 'function' ? await answer() : answer,
-    );
+    await fulfil(route, typeof answer === 'function' ? await answer() : answer);
+    api.answered.set(sha, (api.answered.get(sha) ?? 0) + 1);
   });
   return api;
 }
