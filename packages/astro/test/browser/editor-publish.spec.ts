@@ -15,17 +15,34 @@ import {
   type MockPublishApi,
 } from './editor.js';
 
-// Some follow a Publish through several polls, 5 seconds apart.
-test.describe.configure({ timeout: 60_000 });
-
 /** A Publish's commit. */
 const sha = 'a'.repeat(40);
 
 /** The fixture page's title as built. */
 const title = 'Fisioterapia que te devuelve el movimiento';
 
-/** How long a poll can take to come: the Editor asks every 5 seconds. */
-const nextPoll = { timeout: 12_000 };
+/** How often the Editor asks for a Publish's progress, in ms. */
+const pollEvery = 5_000;
+
+/**
+ * Moves the page's clock on to the Editor's next poll, instead of waiting 5
+ * seconds for it. Install the clock before the page loads, and call this once
+ * the page shows the answer that set the poll: before it, there is no poll to
+ * move on to, and it comes in real time.
+ */
+async function nextPoll(page: Page): Promise<void> {
+  await page.clock.fastForward(pollEvery);
+}
+
+/**
+ * Moves the page's clock past the Editor's next poll, to check that nothing
+ * more is asked. A request the page sends reaches page.route() a moment
+ * later, in real time, so this waits a second for one.
+ */
+async function pastNextPoll(page: Page): Promise<void> {
+  await page.clock.fastForward(pollEvery + 1_000);
+  await page.waitForTimeout(1_000);
+}
 
 /** Types `text` over the Field at `path`, and leaves the Field. */
 async function type(page: Page, path: string, text: string): Promise<void> {
@@ -112,6 +129,7 @@ test('Publish sends the Draft, and the bar follows it through each stage (P3, P4
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = {
@@ -143,16 +161,18 @@ test('Publish sends the Draft, and the bar follows it through each stage (P3, P4
     status: 200,
     json: { stage: 'releasing', version: '1.4.3' },
   };
-  await expect(current).toHaveText('Creando la versión', nextPoll);
+  await nextPoll(page);
+  await expect(current).toHaveText('Creando la versión');
 
   api.status[sha] = {
     status: 200,
     json: { stage: 'released', version: '1.4.3' },
   };
-  await expect(current).toHaveText('Versión creada', nextPoll);
+  await nextPoll(page);
+  await expect(current).toHaveText('Versión creada');
   // The end: nothing more to ask.
   const asked = api.asked.get(sha);
-  await page.waitForTimeout(6_000);
+  await pastNextPoll(page);
   expect(api.asked.get(sha)).toBe(asked);
 });
 
@@ -162,6 +182,7 @@ test('progress survives a reload, and the page keeps showing the new values (P4)
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = {
@@ -188,7 +209,8 @@ test('progress survives a reload, and the page keeps showing the new values (P4)
     status: 200,
     json: { stage: 'released', version: '1.4.3' },
   };
-  await expect(current).toHaveText('Versión creada', nextPoll);
+  await nextPoll(page);
+  await expect(current).toHaveText('Versión creada');
 });
 
 test('Publishing again during a Publish sends what the first one published as the value before (P8)', async ({
@@ -197,6 +219,7 @@ test('Publishing again during a Publish sends what the first one published as th
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = stageOf('validating');
@@ -229,9 +252,10 @@ test('Publishing again during a Publish sends what the first one published as th
   await expect(bar.getByRole('status')).toHaveText('Sin cambios');
 
   // The older one is no longer followed: the newer Release contains it.
-  await expect.poll(() => api.asked.get(newer), nextPoll).toBeGreaterThan(0);
+  await nextPoll(page);
+  await expect.poll(() => api.asked.get(newer)).toBeGreaterThan(0);
   const asked = api.asked.get(sha);
-  await page.waitForTimeout(6_000);
+  await pastNextPoll(page);
   expect(api.asked.get(sha) ?? 0).toBe(asked ?? 0);
   await expect(progress(editor)).toHaveAccessibleName(
     'Publicación de la versión 1.4.4',
@@ -798,6 +822,7 @@ test('a failed Release says the changes are saved and the Developer told, also a
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = stageOf('failed');
@@ -806,8 +831,10 @@ test('a failed Release says the changes are saved and the Developer told, also a
 
   await publishButton(bar).click();
 
+  await expect(progress(editor)).toBeVisible();
+  await nextPoll(page);
   const current = progress(editor).locator('[aria-current="step"]');
-  await expect(current).toHaveText('Ha fallado', nextPoll);
+  await expect(current).toHaveText('Ha fallado');
   const failure =
     'Tus cambios están guardados, pero aún no se ven en la web: algo ha fallado por el camino. Ya se ha avisado a quien mantiene tu web.';
   await expect(editor.getByRole('alert').locator('span')).toHaveText(failure);
@@ -836,14 +863,17 @@ test('a Publish that fails and is then covered by a newer Release shows it after
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = stageOf('failed');
   await openEditor();
   await type(page, 'hero.title', 'Otro título');
   await publishButton(bar).click();
+  await expect(progress(editor)).toBeVisible();
+  await nextPoll(page);
   const current = progress(editor).locator('[aria-current="step"]');
-  await expect(current).toHaveText('Ha fallado', nextPoll);
+  await expect(current).toHaveText('Ha fallado');
 
   api.status[sha] = stageOf('released');
   await page.reload();
@@ -892,15 +922,17 @@ test('the alert of a failed Release leaves the Undo of a removed Item within rea
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = stageOf('failed');
   await openEditor();
   await type(page, 'hero.title', 'Otro título');
   await publishButton(bar).click();
+  await expect(progress(editor)).toBeVisible();
+  await nextPoll(page);
   await expect(progress(editor).locator('[aria-current="step"]')).toHaveText(
     'Ha fallado',
-    nextPoll,
   );
   const services = await texts(page, 'services');
 
@@ -920,6 +952,7 @@ for (const stage of ['deploying', 'live']) {
     bar,
     editor,
   }) => {
+    await page.clock.install();
     const api = await mockPublishApi(page);
     api.publish = { status: 202, json: { sha, version: '1.4.3' } };
     api.status[sha] = stageOf(stage);
@@ -928,9 +961,10 @@ for (const stage of ['deploying', 'live']) {
 
     await publishButton(bar).click();
 
+    await expect(progress(editor)).toBeVisible();
+    await nextPoll(page);
     await expect(progress(editor).locator('[aria-current="step"]')).toHaveText(
       'Versión creada',
-      nextPoll,
     );
   });
 }
@@ -941,6 +975,7 @@ test('when the progress cannot be read, the bar keeps its stage and says so, and
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = { status: 503, headers: { 'Retry-After': '1' } };
@@ -952,12 +987,17 @@ test('when the progress cannot be read, the bar keeps its stage and says so, and
   const current = progress(editor).locator('[aria-current="step"]');
   await expect(current).toHaveText('Validando');
   const unknown = editor.getByText(progressUnknown);
-  // Only once it has failed twice: a moment's 503 is not worth a word.
-  await expect(unknown).toBeVisible({ timeout: 20_000 });
+  // Only once it has failed twice: a moment's 503 is not worth a word. The
+  // bar shows nothing of the first, so the clock goes on a poll at a time.
+  await expect(async () => {
+    await nextPoll(page);
+    await expect(unknown).toBeVisible({ timeout: 500 });
+  }).toPass();
 
   api.status[sha] = stageOf('releasing');
 
-  await expect(current).toHaveText('Creando la versión', nextPoll);
+  await nextPoll(page);
+  await expect(current).toHaveText('Creando la versión');
   await expect(unknown).toHaveCount(0);
 });
 
@@ -967,6 +1007,7 @@ test('a session that ends while the progress is followed says so, and stops aski
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = { status: 401 };
@@ -975,9 +1016,11 @@ test('a session that ends while the progress is followed says so, and stops aski
 
   await publishButton(bar).click();
 
-  await expect(editor.getByText(progressUnknown)).toBeVisible(nextPoll);
+  await expect(progress(editor)).toBeVisible();
+  await nextPoll(page);
+  await expect(editor.getByText(progressUnknown)).toBeVisible();
   const asked = api.asked.get(sha);
-  await page.waitForTimeout(6_000);
+  await pastNextPoll(page);
   expect(api.asked.get(sha)).toBe(asked);
 });
 
@@ -987,6 +1030,7 @@ test('the progress takes one line, under the notices, on any screen (P4)', async
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = {
     status: 202,
@@ -999,7 +1043,9 @@ test('the progress takes one line, under the notices, on any screen (P4)', async
 
   await publishButton(bar).click();
 
-  await expect(editor.getByText(progressUnknown)).toBeVisible(nextPoll);
+  await expect(progress(editor)).toBeVisible();
+  await nextPoll(page);
+  await expect(editor.getByText(progressUnknown)).toBeVisible();
   await expect(editor.getByRole('alert')).toBeVisible();
   const box = (await progress(editor).boundingBox())!;
   expect(box.height).toBeLessThanOrEqual(36);
@@ -1027,6 +1073,7 @@ for (const [locale, message, button] of [
     bar,
     editor,
   }) => {
+    await page.clock.install();
     const api = await mockPublishApi(page);
     api.publish = { status: 202, json: { sha, version: '1.4.3' } };
     api.status[sha] = { status: 404 };
@@ -1036,7 +1083,8 @@ for (const [locale, message, button] of [
     await publishButton(bar, button).click();
     await expect(progress(editor)).toBeVisible();
 
-    await expect(progress(editor)).toHaveCount(0, nextPoll);
+    await nextPoll(page);
+    await expect(progress(editor)).toHaveCount(0);
     await expect(editor.getByRole('alert').locator('span')).toHaveText(message);
 
     // Told once, and what it published no longer stands on the page: the
@@ -1142,7 +1190,8 @@ test('a Publish that is lost forgets what it published on its own page, not on t
   api.status[newer] = { status: 404 };
   await page.goto('/');
   await expect(bar).toBeVisible();
-  await expect(editor.getByRole('alert')).toBeVisible(nextPoll);
+  // Asked at once on the page load.
+  await expect(editor.getByRole('alert')).toBeVisible();
   await expect(progress(editor)).toHaveCount(0);
 
   // What this page published is on its way, so it still stands.
@@ -1162,6 +1211,7 @@ test('a Publish that is lost leaves what an earlier one published on the same pa
   bar,
   editor,
 }) => {
+  await page.clock.install();
   const api = await mockPublishApi(page);
   api.publish = { status: 202, json: { sha, version: '1.4.3' } };
   api.status[sha] = stageOf('validating');
@@ -1175,7 +1225,11 @@ test('a Publish that is lost leaves what an earlier one published on the same pa
   api.publish = { status: 202, json: { sha: newer, version: '1.4.4' } };
   api.status[newer] = { status: 404 };
   await publishButton(bar).click();
-  await expect(editor.getByRole('alert')).toBeVisible(nextPoll);
+  await expect(progress(editor)).toHaveAccessibleName(
+    'Publicación de la versión 1.4.4',
+  );
+  await nextPoll(page);
+  await expect(editor.getByRole('alert')).toBeVisible();
 
   await page.reload();
   await expect(bar).toBeVisible();
