@@ -61,6 +61,9 @@ async function pastNextPoll(page: Page): Promise<void> {
  * have been asked, so it never sets off one more. A move made before the
  * page has handled the answer sets off nothing, and costs a move of
  * `within`.
+ *
+ * `within` is the page's time only on a stopped clock (see `stopClock`). On
+ * a running one, real time moves the page's time on too, uncounted.
  */
 async function askedUntil(
   page: Page,
@@ -1069,6 +1072,7 @@ test('when the progress cannot be read, the bar keeps its stage and says so, and
   };
   await openEditor();
   await type(page, 'hero.title', 'Otro título');
+  await stopClock(page);
 
   await publishButton(bar).click();
 
