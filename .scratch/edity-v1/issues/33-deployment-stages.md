@@ -32,7 +32,7 @@ Also:
 - [ ] A status service that can't be reached never makes a Publish `failed`
 - [ ] Each stage has a test against recorded responses from the status service
 - [ ] The Sites file has no `kubernetes` key, and the server holds no Kubernetes credentials
-- [ ] The Editor's bar shows the four steps of P4
+- [x] The Editor's bar shows the four steps of P4
 
 ## Notes
 
@@ -49,3 +49,5 @@ Needs [RMYPG/platform#142](https://github.com/RMYPG/platform/issues/142), which 
 2026-11-12: The 60-minute rule now applies only while `running` is a known version, decided while reviewing RMYPG/edity-server#5. A `null` `running` happens on every pod restart, and `reason` can't tell a restart from a failure, because a failing image scan sets it even on a live Site. Applying the hour then would report a live Publish as failed and use up its one report. A rollout that can't start, a first install included, still turns `failed` through `phase` within minutes, and the platform alerts on an outage itself.
 
 2026-11-12: The same exception now covers failing a Publish on a `reason` while `target` is older, decided while reviewing RMYPG/edity-server#5. During a cluster recovery the service briefly answers `target` and `running` `null` with a `reason`, and failing then would report Publishes that were live minutes earlier. A stalled scan on a live Site is still reported, because `running` is known there.
+
+2026-11-18: The Editor's half is in [RMYPG/edity#14](https://github.com/RMYPG/edity/pull/14), with the API pinned to edity-server's `ecfa859`. The bar shows Validating, Releasing, Deploying (the server's `released` and `deploying`) and Live, or Failed. It stops following a Publish once it is Live, and keeps following a failed one until a later rollout makes it Live. Every path ran against a mocked API. The end-to-end check of a real Publish still waits on [RMYPG/platform#42](https://github.com/RMYPG/platform/issues/42).

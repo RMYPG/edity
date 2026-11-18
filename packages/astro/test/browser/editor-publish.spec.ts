@@ -185,6 +185,18 @@ async function serveOtherPage(page: Page): Promise<void> {
   });
 }
 
+/**
+ * Keeps `kept` in the browser as the Publish an earlier page load followed on
+ * the fixture Site. Call it before `signIn`, as `keepDraft`.
+ */
+async function keepProgress(page: Page, kept: unknown): Promise<void> {
+  await page.goto('/');
+  await page.evaluate(([key, value]) => localStorage.setItem(key, value), [
+    'edity:publish:v1:fixture',
+    JSON.stringify(kept),
+  ] as const);
+}
+
 /** That a Publish's progress cannot be read, as the Client is told. */
 const progressUnknown =
   'No se puede comprobar ahora cómo va la publicación. Tus cambios están guardados.';
@@ -230,17 +242,78 @@ test('Publish sends the Draft, and the bar follows it through each stage (P3, P4
   await nextPoll(page);
   await expect(current).toHaveText('Creando la versión');
 
+  // Released, but not running yet: Deploying, which is not over.
   api.status[sha] = {
     status: 200,
     json: { stage: 'released', version: '1.4.3' },
   };
   await nextPoll(page);
-  await expect(current).toHaveText('Versión creada');
-  // The end: nothing more to ask.
+  await expect(current).toHaveText('Subiendo a la web');
+  await expect(progress(editor).getByRole('button')).toHaveCount(0);
+
+  api.status[sha] = {
+    status: 200,
+    json: { stage: 'live', version: '1.4.3' },
+  };
+  await nextPoll(page);
+  await expect(current).toHaveText('En la web');
+  // The end: nothing more to ask, and the Client can close it.
   const asked = api.asked.get(sha);
   await pastNextPoll(page);
   expect(api.asked.get(sha)).toBe(asked);
+  await progress(editor).getByRole('button', { name: 'Entendido' }).click();
+  await expect(progress(editor)).toHaveCount(0);
 });
+
+for (const { locale, button, steps } of [
+  {
+    locale: 'es',
+    button: 'Publicar',
+    steps: [
+      'Validando',
+      'Creando la versión',
+      'Subiendo a la web',
+      'En la web',
+    ],
+  },
+  {
+    locale: 'en',
+    button: 'Publish',
+    steps: ['Validating', 'Releasing', 'Deploying', 'Live'],
+  },
+] as const) {
+  test(`the bar shows the four steps in order, one of them current, in ${locale} (P4)`, async ({
+    page,
+    openEditor,
+    bar,
+    editor,
+  }) => {
+    await page.clock.install();
+    const api = await mockPublishApi(page);
+    api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+    api.status[sha] = stageOf('validating');
+    await openEditor({ session: { ...ana, locale } });
+    await type(page, 'hero.title', 'Otro título');
+
+    await publishButton(bar, button).click();
+
+    // Every step, also those a phone hides to keep to one line.
+    const shown = progress(editor).locator('li');
+    const current = progress(editor).locator('[aria-current="step"]');
+    for (const [stage, step] of [
+      ['validating', 0],
+      ['releasing', 1],
+      ['deploying', 2],
+      ['live', 3],
+    ] as const) {
+      api.status[sha] = stageOf(stage);
+      if (stage !== 'validating') await nextPoll(page);
+      await expect(current).toHaveText(steps[step]);
+      await expect(current).toHaveCount(1);
+      await expect(shown).toHaveText(steps);
+    }
+  });
+}
 
 test('progress survives a reload, and the page keeps showing the new values (P4)', async ({
   page,
@@ -276,7 +349,49 @@ test('progress survives a reload, and the page keeps showing the new values (P4)
     json: { stage: 'released', version: '1.4.3' },
   };
   await nextPoll(page);
-  await expect(current).toHaveText('Versión creada');
+  await expect(current).toHaveText('Subiendo a la web');
+});
+
+test('a Publish an earlier Editor kept as released shows as Deploying after a reload, and is still followed (P4)', async ({
+  page,
+  signIn,
+  bar,
+  editor,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', followingOnly);
+  await page.clock.install();
+  const api = await mockPublishApi(page);
+  // The first answer waits, so the bar can be seen as it was kept.
+  let answerFirst: () => void = () => {};
+  const first = new Promise<void>((resolve) => (answerFirst = resolve));
+  api.status[sha] = async () => {
+    if (api.asked.get(sha) === 1) await first;
+    return stageOf('deploying');
+  };
+  // Before Deploying and Live, the Editor showed and kept `released`.
+  await keepProgress(page, {
+    sha,
+    version: '1.4.3',
+    page: 'home',
+    stage: 'released',
+  });
+  await signIn();
+  await page.goto('/');
+  await expect(bar).toBeVisible();
+  await stopClock(page);
+
+  const current = progress(editor).locator('[aria-current="step"]');
+  await expect(current).toHaveText('Subiendo a la web');
+  await expect(progress(editor).getByRole('button')).toHaveCount(0);
+  await expect.poll(() => api.asked.get(sha)).toBe(1);
+
+  // Not over: it is asked again, and goes on to Live. One move can come
+  // before the page has handled the first answer, so it gets two.
+  answerFirst();
+  api.status[sha] = stageOf('live');
+  await askedUntil(page, api, sha, 2, 2 * pollEvery);
+  await expect(current).toHaveText('En la web');
 });
 
 test('Publishing again during a Publish sends what the first one published as the value before (P8)', async ({
@@ -351,6 +466,60 @@ test('Publishing again during a Publish sends what the first one published as th
         },
       ],
     });
+});
+
+test('a Publish overtaken by a newer one is Live with it, and only the newer one is followed (P8)', async ({
+  page,
+  openEditor,
+  bar,
+  editor,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', followingOnly);
+  await page.clock.install();
+  const api = await mockPublishApi(page);
+  api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+  api.status[sha] = stageOf('validating');
+  await openEditor();
+  await type(page, 'hero.title', 'Otro título');
+  await publishButton(bar).click();
+  await expect(progress(editor)).toHaveAccessibleName(
+    'Publicación de la versión 1.4.3',
+  );
+
+  await type(page, 'hero.title', 'Tercer título');
+  api.publish = { status: 202, json: { sha: newer, version: '1.4.4' } };
+  api.status[newer] = stageOf('deploying', '1.4.4');
+  await publishButton(bar).click();
+  await expect(progress(editor)).toHaveAccessibleName(
+    'Publicación de la versión 1.4.4',
+  );
+  const asked = api.asked.get(sha) ?? 0;
+  const current = progress(editor).locator('[aria-current="step"]');
+  await nextPoll(page);
+  await expect(current).toHaveText('Subiendo a la web');
+
+  // The Site runs the newer version: the server answers live for both.
+  api.status[sha] = stageOf('live');
+  api.status[newer] = stageOf('live', '1.4.4');
+  await nextPoll(page);
+  await expect(current).toHaveText('En la web');
+  await expect(progress(editor)).toHaveAccessibleName(
+    'Publicación de la versión 1.4.4',
+  );
+  const askedNewer = api.asked.get(newer);
+  await pastNextPoll(page);
+  expect(api.asked.get(newer)).toBe(askedNewer);
+
+  // After a reload too, the bar follows the newer one only.
+  await page.reload();
+  await expect(bar).toBeVisible();
+  await expect(current).toHaveText('En la web');
+  await expect(progress(editor)).toHaveAccessibleName(
+    'Publicación de la versión 1.4.4',
+  );
+  await pastNextPoll(page);
+  expect(api.asked.get(sha) ?? 0).toBe(asked);
 });
 
 test('after a Publish, Discard goes back to what was published, not to the page as built', async ({
@@ -952,7 +1121,7 @@ test('a Publish that fails and is then covered by a newer Release shows it after
   await page.reload();
   await expect(bar).toBeVisible();
 
-  await expect(current).toHaveText('Versión creada');
+  await expect(current).toHaveText('Subiendo a la web');
   await expect(editor.getByRole('alert')).toHaveCount(0);
 });
 
@@ -992,7 +1161,7 @@ test('a failed Publish that a newer Release covers shows it without a reload (P8
 
   await page.clock.fastForward(10_000);
 
-  await expect(current).toHaveText('Versión creada');
+  await expect(current).toHaveText('Subiendo a la web');
   await expect(editor.getByRole('alert')).toHaveCount(0);
 });
 
@@ -1025,31 +1194,78 @@ test('the alert of a failed Release leaves the Undo of a removed Item within rea
   await expect(editor.getByRole('alert')).toBeVisible();
 });
 
-for (const stage of ['deploying', 'live']) {
-  test(`the server's ${stage}, which comes with ticket 33, shows as Released`, async ({
-    page,
-    openEditor,
-    bar,
-    editor,
-    browserName,
-  }) => {
-    test.skip(browserName !== 'chromium', followingOnly);
-    await page.clock.install();
-    const api = await mockPublishApi(page);
-    api.publish = { status: 202, json: { sha, version: '1.4.3' } };
-    api.status[sha] = stageOf(stage);
-    await openEditor();
-    await type(page, 'hero.title', 'Otro título');
+test('a Publish being deployed is asked about every 5 seconds, and once Live no more (P4)', async ({
+  page,
+  openEditor,
+  bar,
+  editor,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', followingOnly);
+  await page.clock.install();
+  const api = await mockPublishApi(page);
+  api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+  api.status[sha] = stageOf('deploying');
+  await openEditor();
+  await type(page, 'hero.title', 'Otro título');
+  await stopClock(page);
+  await publishButton(bar).click();
+  await expect(progress(editor)).toBeVisible();
+  const current = progress(editor).locator('[aria-current="step"]');
 
-    await publishButton(bar).click();
+  await nextPoll(page);
+  await expect(current).toHaveText('Subiendo a la web');
+  // Not over: it can't be closed, and is asked again 5 seconds on.
+  await expect(progress(editor).getByRole('button')).toHaveCount(0);
+  api.status[sha] = stageOf('live');
+  await askedUntil(page, api, sha, 2, pollEvery);
+  await expect(current).toHaveText('En la web');
+  await expect(
+    progress(editor).getByRole('button', { name: 'Entendido' }),
+  ).toBeVisible();
 
-    await expect(progress(editor)).toBeVisible();
-    await nextPoll(page);
-    await expect(progress(editor).locator('[aria-current="step"]')).toHaveText(
-      'Versión creada',
-    );
-  });
-}
+  // The end: nothing more is asked, not even as seldom as a failed Publish.
+  const asked = api.asked.get(sha);
+  await pastNextPoll(page);
+  await page.clock.fastForward(60_000);
+  await letRequestsArrive(page);
+  expect(api.asked.get(sha)).toBe(asked);
+});
+
+test('a failed Publish that a later rollout makes Live shows it, and is no longer asked about (P4, P8)', async ({
+  page,
+  openEditor,
+  bar,
+  editor,
+  browserName,
+}) => {
+  test.skip(browserName !== 'chromium', followingOnly);
+  await page.clock.install();
+  const api = await mockPublishApi(page);
+  api.publish = { status: 202, json: { sha, version: '1.4.3' } };
+  api.status[sha] = stageOf('failed');
+  await openEditor();
+  await type(page, 'hero.title', 'Otro título');
+  await stopClock(page);
+  await publishButton(bar).click();
+  await expect(progress(editor)).toBeVisible();
+  const current = progress(editor).locator('[aria-current="step"]');
+  await nextPoll(page);
+  await expect(current).toHaveText('Ha fallado');
+  await expect(editor.getByRole('alert')).toBeVisible();
+
+  // The platform runs it after all, or a newer version, within the 30
+  // seconds a failed Publish is asked about.
+  api.status[sha] = stageOf('live');
+  await askedUntil(page, api, sha, 2, 30_000);
+  await expect(current).toHaveText('En la web');
+  await expect(editor.getByRole('alert')).toHaveCount(0);
+
+  const asked = api.asked.get(sha);
+  await page.clock.fastForward(60_000);
+  await letRequestsArrive(page);
+  expect(api.asked.get(sha)).toBe(asked);
+});
 
 test('when the progress cannot be read, the bar keeps its stage and says so, and asks again (P5)', async ({
   page,

@@ -243,6 +243,36 @@ describe('progressStore', () => {
     expect(progressStore('other', () => storage).load()).toBeUndefined();
   });
 
+  test.each([
+    'validating',
+    'releasing',
+    'deploying',
+    'live',
+    'failed',
+  ] as const)('keeps a Publish that is %s (P4)', (stage) => {
+    const storage = memory();
+
+    progressStore('fixture', () => storage).keep({ ...progress, stage });
+
+    expect(progressStore('fixture', () => storage).load()).toEqual({
+      ...progress,
+      stage,
+    });
+  });
+
+  test('brings back a Publish kept as released, before Deploying and Live, as deploying (P4)', () => {
+    const storage = memory();
+    storage.setItem(
+      'edity:publish:v1:fixture',
+      JSON.stringify({ ...progress, stage: 'released' }),
+    );
+
+    expect(progressStore('fixture', () => storage).load()).toEqual({
+      ...progress,
+      stage: 'deploying',
+    });
+  });
+
   test('forgets it when there is none', () => {
     const storage = memory();
     const store = progressStore('fixture', () => storage);
@@ -262,7 +292,7 @@ describe('progressStore', () => {
     ],
     [
       'a stage the Editor does not show',
-      `{"sha":"${'a'.repeat(40)}","version":"1.0.0","page":"home","stage":"live"}`,
+      `{"sha":"${'a'.repeat(40)}","version":"1.0.0","page":"home","stage":"deployed"}`,
     ],
     [
       'no page it published',

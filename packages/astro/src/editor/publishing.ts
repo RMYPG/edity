@@ -42,13 +42,18 @@ const pollEvery = 5000;
 
 /**
  * How often to ask about a Publish that failed, in ms. A newer Release that
- * contains its commit makes it `released`, so it is not over, but that takes
- * someone doing something.
+ * contains its commit takes it on to Deploying, and the Site running it or a
+ * newer version makes it Live, so it is not over, but that takes someone
+ * doing something.
  */
 const pollFailedEvery = 30_000;
 
-/** A stage as the Editor shows it. */
-export type ShownStage = 'validating' | 'releasing' | 'released' | 'failed';
+/**
+ * A stage as the Editor shows it (P4). Deploying is the server's `released`
+ * and `deploying`: the Release exists, and the Site does not run it yet.
+ */
+export type ShownStage =
+  'validating' | 'releasing' | 'deploying' | 'live' | 'failed';
 
 /** The Publish the Editor follows, and how far it has got. */
 export interface Progress {
@@ -190,7 +195,8 @@ export function startPublishing(
         progressUnknown.value = false;
         const stage = shownStage(result.stage);
         show({ ...followed, stage });
-        if (stage !== 'released') {
+        // Live is the end. A failed Publish can still go Live.
+        if (stage !== 'live') {
           follow(stage === 'failed' ? pollFailedEvery : pollEvery);
         }
         return;
@@ -313,21 +319,27 @@ export function startPublishing(
   };
 }
 
-/** Whether the Client can close the progress of a Publish at `stage`. */
+/**
+ * Whether the Client can close the progress of a Publish at `stage`: once it
+ * is Live, or has failed, when what comes next is up to the Developer.
+ */
 export function hasEnded(stage: ShownStage): boolean {
-  return stage === 'released' || stage === 'failed';
+  return stage === 'live' || stage === 'failed';
 }
 
-/** How a stage shows until ticket 33 adds Deploying and Live. */
+/**
+ * How the server's `stage` shows (P4): its `released` and `deploying` are one
+ * step, Deploying.
+ */
 function shownStage(stage: PublishStatus['stage']): ShownStage {
   switch (stage) {
     case 'validating':
     case 'releasing':
+    case 'deploying':
+    case 'live':
     case 'failed':
       return stage;
     case 'released':
-    case 'deploying':
-    case 'live':
-      return 'released';
+      return 'deploying';
   }
 }

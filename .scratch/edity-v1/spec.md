@@ -167,7 +167,7 @@ All routes are on the Site's own origin.
 | `POST /_edity/api/auth/logout` | End the session and clear both cookies |
 | `GET /_edity/api/session` | The Client's name, locale and Site, or 401 |
 | `POST /_edity/api/publish` | `{ page, changes: [{ path, before, after }] }` returns `202 { sha, version, conflicts? }`, `409 { conflicts }` when nothing merged, `422 { violations }`, or `401` |
-| `GET /_edity/api/publish/:sha` | `{ stage: validating \| releasing \| released \| deploying \| live \| failed, version }` (`deploying` and `live` come with ticket 33) |
+| `GET /_edity/api/publish/:sha` | `{ stage: validating \| releasing \| released \| deploying \| live \| failed, version }`. The Editor shows `released` and `deploying` as one step, Deploying (P4) |
 
 ## Build order
 
