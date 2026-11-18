@@ -7,8 +7,13 @@ interface Props {
   readonly editing: Editing;
 }
 
-/** The stages a Publish goes through when nothing fails, in order. */
-const steps: readonly ShownStage[] = ['validating', 'releasing', 'released'];
+/** The stages a Publish goes through when nothing fails, in order (P4). */
+const steps: readonly ShownStage[] = [
+  'validating',
+  'releasing',
+  'deploying',
+  'live',
+];
 
 /** The progress of the Publish the bar follows, just above it. */
 export function PublishProgress({ editing }: Props) {

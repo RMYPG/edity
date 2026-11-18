@@ -35,10 +35,10 @@ export interface Messages {
   /** A counter on a Field that broke the Limit as published (L7). */
   published(limit: string): string;
   /**
-   * A Publish whose Release failed after its commit (P5): the changes are
-   * saved, not live yet, and the Developer has been notified. The server
-   * answers `failed` only once an issue on the Site repository tells the
-   * Developer (V6).
+   * A Publish that failed after its commit (P5), in its Release or in the
+   * rollout of it: the changes are saved, not live yet, and the Developer has
+   * been notified. The server answers `failed` only once an issue on the Site
+   * repository tells the Developer (V6).
    */
   readonly releaseFailed: string;
   /** The List controls' text. */

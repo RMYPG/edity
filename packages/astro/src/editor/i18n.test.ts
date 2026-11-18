@@ -99,13 +99,15 @@ describe('what a Publish came to (P5)', () => {
     expect(es.stages).toEqual({
       validating: 'Validando',
       releasing: 'Creando la versión',
-      released: 'Versión creada',
+      deploying: 'Subiendo a la web',
+      live: 'En la web',
       failed: 'Ha fallado',
     });
     expect(en.stages).toEqual({
       validating: 'Validating',
       releasing: 'Releasing',
-      released: 'Released',
+      deploying: 'Deploying',
+      live: 'Live',
       failed: 'Failed',
     });
   });

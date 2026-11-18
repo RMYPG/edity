@@ -7,7 +7,7 @@
 import { effect, untracked } from '@preact/signals';
 import type { Change, ContentValue, Draft } from './draft.js';
 import type { CommittedChange } from './published.js';
-import type { Progress } from './publishing.js';
+import type { Progress, ShownStage } from './publishing.js';
 
 /** The part of the browser's `Storage` the Draft is kept in. */
 export type KeptStorage = Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
@@ -125,7 +125,7 @@ export function progressStore(
     load() {
       try {
         const kept: unknown = JSON.parse(storage().getItem(key) ?? 'null');
-        return isProgress(kept) ? kept : undefined;
+        return keptProgress(kept);
       } catch {
         return undefined;
       }
@@ -212,19 +212,35 @@ function isSha(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{40}$/.test(value);
 }
 
-function isProgress(value: unknown): value is Progress {
-  if (typeof value !== 'object' || value === null) return false;
+/**
+ * The Publish kept as `value`, if it is one. An Editor from before Deploying
+ * and Live kept a Release that exists as `released`, which is Deploying now:
+ * it is followed on until it is Live.
+ */
+function keptProgress(value: unknown): Progress | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
   const { sha, version, page, stage } = value as Record<string, unknown>;
-  return (
-    isSha(sha) &&
+  const shown = stage === 'released' ? 'deploying' : stage;
+  return isSha(sha) &&
     typeof version === 'string' &&
     typeof page === 'string' &&
-    (stage === 'validating' ||
-      stage === 'releasing' ||
-      stage === 'released' ||
-      stage === 'failed')
-  );
+    isShownStage(shown)
+    ? { sha, version, page, stage: shown }
+    : undefined;
 }
+
+function isShownStage(value: unknown): value is ShownStage {
+  return typeof value === 'string' && Object.hasOwn(shownStages, value);
+}
+
+/** Every stage the Editor shows: a new one fails the type-check. */
+const shownStages: Readonly<Record<ShownStage, true>> = {
+  validating: true,
+  releasing: true,
+  deploying: true,
+  live: true,
+  failed: true,
+};
 
 function isContentValue(value: unknown): value is ContentValue {
   switch (typeof value) {

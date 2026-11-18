@@ -56,7 +56,8 @@ export const publishMessages: Readonly<Record<Locale, PublishMessages>> = {
     stages: {
       validating: 'Validando',
       releasing: 'Creando la versión',
-      released: 'Versión creada',
+      deploying: 'Subiendo a la web',
+      live: 'En la web',
       failed: 'Ha fallado',
     },
     progress: (version) => `Publicación de la versión ${version}`,
@@ -111,7 +112,8 @@ export const publishMessages: Readonly<Record<Locale, PublishMessages>> = {
     stages: {
       validating: 'Validating',
       releasing: 'Releasing',
-      released: 'Released',
+      deploying: 'Deploying',
+      live: 'Live',
       failed: 'Failed',
     },
     progress: (version) => `Publish of version ${version}`,

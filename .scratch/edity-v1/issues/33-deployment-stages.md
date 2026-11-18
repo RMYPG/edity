@@ -32,7 +32,7 @@ Also:
 - [ ] A status service that can't be reached never makes a Publish `failed`
 - [ ] Each stage has a test against recorded responses from the status service
 - [ ] The Sites file has no `kubernetes` key, and the server holds no Kubernetes credentials
-- [ ] The Editor's bar shows the four steps of P4
+- [x] The Editor's bar shows the four steps of P4
 
 ## Notes
 
