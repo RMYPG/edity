@@ -19,6 +19,15 @@ jobs:
     # Playwright runs 2 workers. On a 2-vCPU runner it runs 1, and the browser
     # tests alone took over 12 of the 15 minutes.
     runs-on: ubuntu-24.04
+    # Playwright's image holds the system libraries the browsers need, so a
+    # run no longer downloads them from Ubuntu's mirror. On 2026-11-18 and 19
+    # that download, 125 MB at 160 kB/s, took 13 of the 15 minutes. Keep the
+    # tag on @playwright/test's version in pnpm-lock.yaml, and pin the digest.
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.1-noble@sha256:2f05f8a734509a7b3f26a912639488ee08f58a7b292d14d62271bcff9038768f
+      # The runner's own user, as Playwright's CI guide runs it: as root,
+      # Chromium runs without its sandbox.
+      options: --user 1001
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -31,11 +40,12 @@ jobs:
         with:
           version: 2026.10.8
 
-      # Playwright's browsers and the system libraries they need. `mise run
-      # ci` installs the browsers too, but cannot install libraries without
-      # sudo.
+      # The image already holds the browsers of its Playwright version. If the
+      # lockfile's version ever differs, this downloads the matching ones,
+      # about 30 seconds; the system libraries come from the image either way.
       - name: Install the browsers for the browser tests
-        run: mise run browsers --with-deps
+        run: mise run browsers
+        timeout-minutes: 5
 
       - name: Lint, check formatting, type-check, test and check the packages
         run: mise run ci
